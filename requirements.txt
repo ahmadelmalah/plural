@@ -1,2 +1,14 @@
 fastapi
 uvicorn
+sqlalchemy
+alembic
+psycopg2-binary
+pydantic[email]
+sqladmin
+jinja2
+python-multipart
+itsdangerous
+
+# Testing
+pytest
+httpx
