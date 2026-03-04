@@ -9,10 +9,14 @@ toc: true
 
 ## 1. Introduction
 
-### 1.1 Selected Template
+### 1.1 Code Repository
+
+The full source code for this project is publicly available at: [https://github.com/ahmadelmalah/plural](https://github.com/ahmadelmalah/plural)
+
+### 1.2 Selected Template
 7.1 Project Idea 1: Identity and profile management API
 
-### 1.2 Challenge Overview: Digital Identity Fragmentation
+### 1.3 Challenge Overview: Digital Identity Fragmentation
 
 Modern digital platforms are designed to capture or focus on a certain dimensions of human identities. When users engage with these platforms, they are expected to show the identity, the dimension and the role suited to that environment. For example, LinkedIn is designed to highlight the professional persona; it is a space where sharing an Azure certification is appropriate, but sharing a gaming high score would be out of context. Conversely, a platform like Steam captures the recreational "gamer" dimension, while Goodreads captures the intellectual "reader" dimension.
 
@@ -26,7 +30,7 @@ However, while these dimensions are distinct in function, focus and interest the
 
 **Conclusion:** To bridge these gaps, we need a centralized system where users can manage their identity dimensions, choosing what to share publicly and what to keep private, while integrating seamlessly with existing external platforms via a RESTful API.
 
-### 1.3 Solution Overview
+### 1.4 Solution Overview
 
 The project aims for implementing a centralized place for orchestrating the digital multidimensional identity, by allowing the users to manage the identity as an aggregation of distinct personas, each persona represents a particular dimension (e.g. Legal, Reader, Gamer, Worker), and has its own set of attributes and relevant in a certain context, each persona is set to be public or private (protected access)
 
@@ -36,7 +40,7 @@ The system responds dynamically based on the context. If a recruiter queries the
 
 **The Final Outcome:** The system provides both a REST API for programmatic access and a web interface (GUI) that allows users to manage their personas through a browser.
 
-### 1.4 Solution Scope
+### 1.5 Solution Scope
 
 It's important to define a clear scope to avoid any scope creep
 
@@ -50,7 +54,7 @@ It's important to define a clear scope to avoid any scope creep
 
 While the application could integrate with external systems like IAM and SSO services, it is designed from the ground up to serve a single purpose: managing and projecting the different representations and dimensions (personas) of the user.
 
-### 1.5 Motivation
+### 1.6 Motivation
 
 **Personal Motivation:** I am deeply interested in backend web development, data, security and identity management systems, I enjoy building APIs that could be used and integrated in different systems, I enjoy system integration. My passion lies in the challenge of system integration: building secure, scalable APIs that act as bridges between disconnected platforms. For me, this project is not just a requirement; it is an opportunity to build the kind of structural, data-driven tool that I personally enjoy using.
 
@@ -316,7 +320,7 @@ The test suite uses pytest and FastAPI's TestClient to simulate real HTTP reques
 
 #### Success Criteria
 
-Each criterion is derived from the project aims defined in section 1.2:
+Each criterion is derived from the project aims defined in section 1.3:
 
 - **Privacy Enforcement (addresses the "Private Identity" goal):** The central promise of this project is that private personas are hidden from unauthorised access. To verify this, private personas must return `403 Forbidden` when accessed without a valid token. Tests cover three cases: no token provided, wrong token provided, and correct token provided, ensuring the privacy boundary holds in all scenarios.
 
@@ -330,7 +334,7 @@ Each criterion is derived from the project aims defined in section 1.2:
 
 In addition to unit-level criteria, the test suite includes two scenario tests that simulate real-world use cases:
 
-- **Recruiter Scenario:** A recruiter queries a user's profile via `GET /api/users/{id}`. The test verifies that they see only public personas (Professional, Gamer) and have no indication that a private Legal persona exists. This directly validates the "Public multidimensional Identity" goal from section 1.2.
+- **Recruiter Scenario:** A recruiter queries a user's profile via `GET /api/users/{id}`. The test verifies that they see only public personas (Professional, Gamer) and have no indication that a private Legal persona exists. This directly validates the "Public multidimensional Identity" goal from section 1.3.
 
 - **Contextual Identity Scenario:** The same user is queried by two different callers, one without a token and one with a valid access token. The test verifies that they receive different responses from the same system, proving that the API supports contextual identity projection.
 
@@ -416,7 +420,7 @@ The current system allows users to create multiple personas, each with its own s
 
 The improvements I identified in section 5.5 fall into a natural priority order. First, the security fixes (bcrypt migration and rate limiting) because they are high-impact and low-effort, both can be done without changing the application's architecture. Second, the `main.py` refactor, because the pattern is already established with the web routes and it would make the codebase easier to extend. Third, the Cognito integration, which is the largest change but is deliberately decoupled from the persona logic.
 
-Beyond those fixes, the feature I would most want to add is **external platform connectors**, allowing a persona to pull data from external APIs automatically. For example, a Gamer persona could sync with Steam to display current stats, or a Professional persona could pull repositories from GitHub. This would move Plural from a static data store to a live identity aggregation layer, which is closer to the original vision described in section 1.2.
+Beyond those fixes, the feature I would most want to add is **external platform connectors**, allowing a persona to pull data from external APIs automatically. For example, a Gamer persona could sync with Steam to display current stats, or a Professional persona could pull repositories from GitHub. This would move Plural from a static data store to a live identity aggregation layer, which is closer to the original vision described in section 1.3.
 
 ### 6.3 Reflection
 
