@@ -172,11 +172,9 @@ The following sections describe the key technical decisions I made and the reaso
 
 #### 3.4.1 Authentication Strategy (Delegated Auth)
 
-**Decision:** Delegate authentication to AWS Cognito (OIDC)
+**Decision:** Session-based authentication, with the architecture designed for future migration to a delegated provider (e.g. AWS Cognito, Auth0)
 
-**Justification:** Building a secure authentication system from scratch (handling password hashing, MFA, and session security) is error-prone and distracts from the core innovation of "Persona Management." By treating Authentication as a commodity and offloading it to AWS, the project focuses its engineering effort on the "Representation Logic."
-
-**What I Built:** I implemented a simpler session-based authentication using password hashing and cookies. My reasoning was that spending time on Cognito integration early on was distracting me from the core problem I wanted to solve, persona management. I wanted to get the persona logic right first, and worry about production-grade auth later. The design is kept abstract enough to allow swapping the auth provider (Cognito, Auth0, or Google Identity) without rewriting the persona logic.
+**Justification:** Building a fully-featured authentication system from scratch (handling MFA, social login, and password reset flows) is error-prone and distracts from the core innovation of "Persona Management." I initially considered delegating authentication entirely to AWS Cognito (OIDC), but that was pulling my attention away from the core problem I wanted to solve. Instead, I implemented a simpler session-based authentication using password hashing and cookies, which gave me a working auth layer without the integration overhead. The design is kept abstract enough to allow swapping the auth provider (Cognito, Auth0, or Google Identity) without rewriting the persona logic.
 
 #### 3.4.2 API-First Design (REST)
 
@@ -186,27 +184,23 @@ The following sections describe the key technical decisions I made and the reaso
 
 #### 3.4.3 Backend Framework
 
-**Decision:** Python Flask.
+**Decision:** FastAPI (migrated from an initial Flask prototype)
 
-**Justification:** Flask was selected over heavier frameworks (like Django) for its micro-framework philosophy. It allows for rapid prototyping of the routing logic and offers granular control over the HTTP response lifecycle, which is critical for implementing the custom "Context Headers" logic. Additionally, its robust extension ecosystem (Flask-SQLAlchemy, Authlib) simplifies the integration with AWS OIDC.
-
-**Migration to FastAPI:** After working with the Flask prototype, I went ahead with the migration to FastAPI. The benefits I anticipated turned out to be real in practice:
+**Justification:** I initially chose Flask for its micro-framework philosophy, which allowed rapid prototyping of the routing logic and offered granular control over the HTTP response lifecycle. However, after building the prototype, I migrated to FastAPI for several benefits that proved valuable in practice:
 
 - **Native Asynchronous Support (ASGI):** FastAPI is built on Starlette, allowing for non-blocking I/O. This matters for an identity service that may eventually need to query external APIs.
 
-- **Strict Data Validation (Pydantic):** FastAPI uses Pydantic for request and response validation. This was a significant improvement, I defined separate response models for public responses (which exclude the `access_token`) and owner responses (which include it). Pydantic handles the filtering automatically at the framework level, which is more reliable than the manual dictionary manipulation I was doing in Flask.
+- **Strict Data Validation (Pydantic):** FastAPI uses Pydantic for request and response validation. This was a significant improvement over Flask, where I was doing manual dictionary manipulation. I defined separate response models for public responses (which exclude the `access_token`) and owner responses (which include it). Pydantic handles the filtering automatically at the framework level, which is more reliable.
 
 - **Automatic Documentation:** FastAPI generates an interactive Swagger UI at `/docs`, which made testing the API much easier during development and would make it straightforward for third-party developers to consume.
 
 #### 3.4.4 Database Engine
 
-**Decision:** SQLite for the Prototype, PostgreSQL for the Current Build
+**Decision:** PostgreSQL (migrated from an initial SQLite prototype)
 
-**Justification:** I initially chose SQLite for prototyping because it required no setup and let me focus on the application logic. The application uses SQLAlchemy ORM, which made the eventual migration straightforward. I have since migrated to PostgreSQL running inside Docker, which gives me proper concurrent access, better JSON handling, and a setup that more closely resembles a production environment. The tests still use an in-memory SQLite database for speed and isolation.
+**Justification:** I initially chose SQLite for prototyping because it required no setup and let me focus on the application logic. The application uses SQLAlchemy ORM, which made the eventual migration straightforward. I migrated to PostgreSQL running inside Docker, which gives proper concurrent access, better JSON handling, and a setup that more closely resembles a production environment. The tests still use an in-memory SQLite database for speed and isolation.
 
-### 3.5 Initial Database Design
-
-This is not the final database design, this is just an initial design to build the prototype test the hypothesis.
+### 3.5 Database Design
 
 I decided to start with two main tables representing the two main entities we have:
 
@@ -247,7 +241,7 @@ I decided to start with two main tables representing the two main entities we ha
 
 ## 4. Implementation
 
-### 4.1 Current Technical Stack
+### 4.1 Technical Stack
 
 After the prototyping phase with Flask and SQLite, I migrated the project to a stack that better suits the requirements:
 
@@ -386,7 +380,7 @@ In section 5.1, I defined three concrete success criteria. Here is how the tests
 
 **Data Integrity ("Deleting a User must cascade and remove all associated Personas"):** The `test_delete_user_deletes_all_personas` test creates a user with personas, deletes the user, and verifies that both personas return 404.
 
-### 5.5 Limitations and Improvement Plan
+### 5.5 Limitations and Future Improvements
 
 The project meets the success criteria I defined, but working through the implementation exposed several weaknesses. For each one, I describe the problem, why it matters, and how I would concretely fix it.
 
@@ -400,7 +394,7 @@ The API has no protection against brute-force attacks. An attacker could send th
 
 **Authentication Layer (Architecture - Medium Priority)**
 
-I deferred Cognito integration to focus on the persona logic, which was the right call at this stage. But the current auth lacks features users would expect: no multi-factor authentication, no social login, and no password reset flow. The integration approach would be to replace the custom login routes with an OIDC flow against Cognito's hosted UI, adding a `cognito_sub` field to the User table to link external identities to local accounts. The persona logic would remain untouched since it depends only on `user_id`, not on how the user authenticated - this separation was a deliberate design choice.
+I deferred Cognito integration to focus on the persona logic, which was the right call for this project. But the current auth lacks features users would expect: no multi-factor authentication, no social login, and no password reset flow. The integration approach would be to replace the custom login routes with an OIDC flow against Cognito's hosted UI, adding a `cognito_sub` field to the User table to link external identities to local accounts. The persona logic would remain untouched since it depends only on `user_id`, not on how the user authenticated - this separation was a deliberate design choice.
 
 **Monolithic API File (Maintainability - Medium Priority)**
 
@@ -420,9 +414,9 @@ The current system allows users to create multiple personas, each with its own s
 
 ### 6.2 What I Would Do Next
 
-The improvements I identified in section 5.4 fall into a natural priority order. First, the security fixes (bcrypt migration and rate limiting) because they are high-impact and low-effort, both can be done without changing the application's architecture. Second, the `main.py` refactor, because the pattern is already established with the web routes and it would make the codebase easier to extend. Third, the Cognito integration, which is the largest change but is deliberately decoupled from the persona logic.
+The improvements I identified in section 5.5 fall into a natural priority order. First, the security fixes (bcrypt migration and rate limiting) because they are high-impact and low-effort, both can be done without changing the application's architecture. Second, the `main.py` refactor, because the pattern is already established with the web routes and it would make the codebase easier to extend. Third, the Cognito integration, which is the largest change but is deliberately decoupled from the persona logic.
 
-Beyond those fixes, the feature I am most interested in is **external platform connectors**, allowing a persona to pull data from external APIs automatically. For example, a Gamer persona could sync with Steam to display current stats, or a Professional persona could pull repositories from GitHub. This would move Plural from a static data store to a live identity aggregation layer, which is closer to the original vision described in section 1.2.
+Beyond those fixes, the feature I would most want to add is **external platform connectors**, allowing a persona to pull data from external APIs automatically. For example, a Gamer persona could sync with Steam to display current stats, or a Professional persona could pull repositories from GitHub. This would move Plural from a static data store to a live identity aggregation layer, which is closer to the original vision described in section 1.2.
 
 ### 6.3 Reflection
 
