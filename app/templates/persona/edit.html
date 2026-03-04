@@ -40,9 +40,9 @@
                     {% if persona.data %}
                         {% for key, value in persona.data.items() %}
                             <div class="flex space-x-2 data-row">
-                                <input type="text" name="data_keys[]" value="{{ key }}"
+                                <input type="text" name="data_keys" value="{{ key }}"
                                     class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-                                <input type="text" name="data_values[]" value="{{ value if value is string else value | join(', ') }}"
+                                <input type="text" name="data_values" value="{{ value if value is string else value | join(', ') }}"
                                     class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
                                 <button type="button" onclick="removeRow(this)" class="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg">
                                     &times;
@@ -51,9 +51,9 @@
                         {% endfor %}
                     {% else %}
                         <div class="flex space-x-2 data-row">
-                            <input type="text" name="data_keys[]" placeholder="Key"
+                            <input type="text" name="data_keys" placeholder="Key"
                                 class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-                            <input type="text" name="data_values[]" placeholder="Value"
+                            <input type="text" name="data_values" placeholder="Value"
                                 class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
                             <button type="button" onclick="removeRow(this)" class="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg">
                                 &times;
@@ -105,9 +105,9 @@ function addRow() {
     const row = document.createElement('div');
     row.className = 'flex space-x-2 data-row';
     row.innerHTML = `
-        <input type="text" name="data_keys[]" placeholder="Key"
+        <input type="text" name="data_keys" placeholder="Key"
             class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-        <input type="text" name="data_values[]" placeholder="Value"
+        <input type="text" name="data_values" placeholder="Value"
             class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
         <button type="button" onclick="removeRow(this)" class="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg">
             &times;
