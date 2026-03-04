@@ -2,6 +2,7 @@ import json
 from typing import Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqladmin import Admin
@@ -112,6 +113,8 @@ def get_current_user_for_template(request: Request, db: Session) -> User | None:
 @app.get("/")
 async def root(request: Request, db: Session = Depends(get_db)):
     user = get_current_user_for_template(request, db)
+    if user:
+        return RedirectResponse(url="/dashboard", status_code=302)
     return templates.TemplateResponse(request, "index.html", {"user": user})
 
 
