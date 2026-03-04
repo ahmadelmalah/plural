@@ -132,7 +132,7 @@ While the previous sections covered infrastructure-level solutions, there is als
 
 ---
 
-## 3. Design & Plan
+## 3. Design
 
 ### 3.1 Project Overview
 
@@ -243,47 +243,7 @@ I decided to start with two main tables representing the two main entities we ha
 
 **[Figure 2: Entity Relationship Diagram — to be added]**
 
-### 3.6 Work Plan
-
-The project execution is structured into three distinct development phases, allowing for iterative refinement and risk mitigation.
-
-![Figure 3: Project Gantt Chart](gantt-chart.png)
-
-#### Phase 1: Discovery & Prototyping (Weeks 1-10) [COMPLETED]
-
-This initial phase focused on feasibility analysis and architectural validation. The primary objective was to test critical strategic assumptions and build a working prototype.
-
-The key achievements of this phase were:
-- Having a solid vision about the project and its scope
-- Experimenting with AWS Cognito integration to understand the auth landscape
-- Building a basic prototype with Flask and SQLite, which helped me identify what worked and what needed changing
-
-#### Phase 2: Core Implementation (Weeks 11-18) [CURRENT STATUS]
-
-This phase focuses on transitioning from the prototype to a proper implementation. The work done so far includes:
-- Migrated from Flask to FastAPI for better validation and auto-generated docs
-- Migrated from SQLite to PostgreSQL with Docker for a production-like setup
-- Implemented the full REST API with privacy enforcement (public/private personas with access tokens)
-- Built a web interface using Jinja2 templates for user-facing persona management
-- Wrote 52 automated tests using pytest
-- Added an admin panel using SQLAdmin
-- Implemented session-based authentication as an MVP (deferring Cognito to a later phase)
-
-Remaining work for this phase:
-- Integrating AWS Cognito for production-grade authentication
-- Refactoring the monolithic `main.py` into separate route modules
-
-#### Phase 3: Refinement & Summative Evaluation (Week 19+)
-
-This phase will be dedicated to assessing the system against the original design requirements and addressing remaining gaps.
-
-Planned activities:
-- **Security Improvements:** Migrating from SHA256 to bcrypt for password hashing, adding rate limiting
-- **Product Evaluation:** Does the project solve the main problem and address the requirements?
-- **Documentation:** Finalizing technical documentation and the project report
-- **Critical Analysis:** Producing a final evaluation detailing the system's strengths, limitations, and potential for future work
-
-### 3.7 Success Criteria & Evaluation Methodology
+### 3.6 Success Criteria & Evaluation Methodology
 
 #### Why Automated Testing
 
