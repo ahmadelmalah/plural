@@ -374,11 +374,11 @@ The 52 tests are organised into the following groups, as shown in Table 3.
 | Token Regeneration | 3 | Success (old token invalidated, new works), invalid token, not found |
 | Cascade Delete | 1 | Deleting user removes all their personas |
 | Privacy Boundaries | 2 | Recruiter scenario (only sees public), contextual identity (same user, different responses) |
-| Data Integrity | 3 | Maps directly to the success criteria from section 3.7 |
+| Data Integrity | 3 | Maps directly to the success criteria from section 5.1 |
 
 ### 5.4 Results Against Success Criteria
 
-In section 3.7, I defined three concrete success criteria. Here is how the tests validate each one:
+In section 5.1, I defined three concrete success criteria. Here is how the tests validate each one:
 
 **Security Compliance ("Private Personas must return 403 Forbidden when accessed without a token"):** Multiple tests confirm this. `test_get_private_persona_without_token_forbidden` sends a GET request to a private persona without any token header and asserts a 403 response. `test_get_private_persona_with_invalid_token` does the same with a wrong token and also gets 403.
 
