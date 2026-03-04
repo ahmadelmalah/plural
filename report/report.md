@@ -40,7 +40,7 @@ The system responds dynamically based on the context. If a recruiter queries the
 
 It's important to define a clear scope to avoid any scope creep
 
-**What this project IS:** The application focuses on the Representation Layer (how the user wants to present themselves in different contexts). For the current iteration, the system includes a simple built-in session-based authentication to get the core persona management working. In future iterations, I plan to delegate authentication to an external provider like AWS Cognito to enhance integration with other systems and improve security.
+**What this project IS:** The application focuses on the Representation Layer (how the user wants to present themselves in different contexts). The system uses a built-in session-based authentication to support the core persona management functionality. Delegating authentication to an external provider like AWS Cognito remains a candidate for future development to enhance integration with other systems and improve security.
 
 **What this project is NOT:** To clarify the specific contribution of this work, it is important to distinguish it from existing terms:
 
@@ -176,7 +176,7 @@ The following sections describe the key technical decisions I made and the reaso
 
 **Justification:** Building a secure authentication system from scratch (handling password hashing, MFA, and session security) is error-prone and distracts from the core innovation of "Persona Management." By treating Authentication as a commodity and offloading it to AWS, the project focuses its engineering effort on the "Representation Logic."
 
-**Current Status:** For the current iteration, I decided to implement a simpler session-based authentication using password hashing and cookies. My reasoning was that spending time on Cognito integration early on was distracting me from the core problem I wanted to solve, persona management. I wanted to get the persona logic right first, and worry about production-grade auth later. Cognito integration remains a goal for a future phase, and the design is kept abstract enough to allow swapping the auth provider (Cognito, Auth0, or Google Identity) without rewriting the persona logic.
+**What I Built:** I implemented a simpler session-based authentication using password hashing and cookies. My reasoning was that spending time on Cognito integration early on was distracting me from the core problem I wanted to solve, persona management. I wanted to get the persona logic right first, and worry about production-grade auth later. The design is kept abstract enough to allow swapping the auth provider (Cognito, Auth0, or Google Identity) without rewriting the persona logic.
 
 #### 3.4.2 API-First Design (REST)
 
@@ -242,38 +242,6 @@ I decided to start with two main tables representing the two main entities we ha
 | updated_at | When was the last time the persona was updated |
 
 **[Figure 2: Entity Relationship Diagram — to be added]**
-
-### 3.6 Success Criteria & Evaluation Methodology
-
-#### Why Automated Testing
-
-The core product is a REST API designed primarily for machine consumption. Unlike a user-facing GUI where subjective usability matters, an API either behaves correctly or it does not, making automated assertions the natural fit. I considered other evaluation methods: user testing would be appropriate if the web interface were the primary product, but since the API is the main deliverable, functional correctness matters more than subjective experience. Expert review could be valuable for security auditing, but at this stage the priority is verifying that the privacy model works as designed.
-
-The test suite uses pytest and FastAPI's TestClient to simulate real HTTP requests and verify the expected responses. Tests run against an in-memory SQLite database, ensuring isolation (each test starts clean) and speed (no external dependencies).
-
-#### Success Criteria
-
-Each criterion is derived from the project aims defined in section 1.2:
-
-- **Privacy Enforcement (addresses the "Private Identity" goal):** The central promise of this project is that private personas are hidden from unauthorised access. To verify this, private personas must return `403 Forbidden` when accessed without a valid token. Tests cover three cases: no token provided, wrong token provided, and correct token provided, ensuring the privacy boundary holds in all scenarios.
-
-- **Contextual Identity (addresses the "context collapse" problem):** The project exists because current platforms show the same data to everyone. To verify that Plural solves this, the API must return distinct data for the same user depending on the access context. Tests verify that `GET /api/users/{id}` returns only public personas, while `GET /api/personas/{id}` with the correct `X-Access-Token` header returns private persona data. This directly tests whether the system prevents context collapse.
-
-- **Data Integrity:** Deleting a User must cascade and remove all associated Personas to prevent orphaned data. Tests create a user with multiple personas, delete the user, and verify all personas return `404 Not Found`.
-
-- **Input Validation:** The API must reject malformed input (invalid emails, missing required fields, duplicate usernames) with appropriate error codes (`400` or `422`).
-
-#### Scenario-Based Evaluation
-
-In addition to unit-level criteria, the test suite includes two scenario tests that simulate real-world use cases:
-
-- **Recruiter Scenario:** A recruiter queries a user's profile via `GET /api/users/{id}`. The test verifies that they see only public personas (Professional, Gamer) and have no indication that a private Legal persona exists. This directly validates the "Public multidimensional Identity" goal from section 1.2.
-
-- **Contextual Identity Scenario:** The same user is queried by two different callers, one without a token and one with a valid access token. The test verifies that they receive different responses from the same system, proving that the API supports contextual identity projection.
-
-#### Web Interface Verification
-
-The web interface is evaluated through manual walkthrough testing, covering: user registration and login flow, creating and editing personas from the dashboard, toggling persona visibility between public and private, verifying that the public profile page (`/u/{username}`) shows only public personas, and confirming that access tokens can be regenerated from the dashboard.
 
 ---
 
@@ -344,7 +312,39 @@ Each persona type has completely different fields, and the system handles them a
 
 ## 5. Evaluation
 
-### 5.1 Testing Approach
+### 5.1 Evaluation Strategy & Success Criteria
+
+#### Why Automated Testing
+
+The core product is a REST API designed primarily for machine consumption. Unlike a user-facing GUI where subjective usability matters, an API either behaves correctly or it does not, making automated assertions the natural fit. I considered other evaluation methods: user testing would be appropriate if the web interface were the primary product, but since the API is the main deliverable, functional correctness matters more than subjective experience. Expert review could be valuable for security auditing, but at this stage the priority is verifying that the privacy model works as designed.
+
+The test suite uses pytest and FastAPI's TestClient to simulate real HTTP requests and verify the expected responses. Tests run against an in-memory SQLite database, ensuring isolation (each test starts clean) and speed (no external dependencies).
+
+#### Success Criteria
+
+Each criterion is derived from the project aims defined in section 1.2:
+
+- **Privacy Enforcement (addresses the "Private Identity" goal):** The central promise of this project is that private personas are hidden from unauthorised access. To verify this, private personas must return `403 Forbidden` when accessed without a valid token. Tests cover three cases: no token provided, wrong token provided, and correct token provided, ensuring the privacy boundary holds in all scenarios.
+
+- **Contextual Identity (addresses the "context collapse" problem):** The project exists because current platforms show the same data to everyone. To verify that Plural solves this, the API must return distinct data for the same user depending on the access context. Tests verify that `GET /api/users/{id}` returns only public personas, while `GET /api/personas/{id}` with the correct `X-Access-Token` header returns private persona data. This directly tests whether the system prevents context collapse.
+
+- **Data Integrity:** Deleting a User must cascade and remove all associated Personas to prevent orphaned data. Tests create a user with multiple personas, delete the user, and verify all personas return `404 Not Found`.
+
+- **Input Validation:** The API must reject malformed input (invalid emails, missing required fields, duplicate usernames) with appropriate error codes (`400` or `422`).
+
+#### Scenario-Based Evaluation
+
+In addition to unit-level criteria, the test suite includes two scenario tests that simulate real-world use cases:
+
+- **Recruiter Scenario:** A recruiter queries a user's profile via `GET /api/users/{id}`. The test verifies that they see only public personas (Professional, Gamer) and have no indication that a private Legal persona exists. This directly validates the "Public multidimensional Identity" goal from section 1.2.
+
+- **Contextual Identity Scenario:** The same user is queried by two different callers, one without a token and one with a valid access token. The test verifies that they receive different responses from the same system, proving that the API supports contextual identity projection.
+
+#### Web Interface Verification
+
+The web interface is evaluated through manual walkthrough testing, covering: user registration and login flow, creating and editing personas from the dashboard, toggling persona visibility between public and private, verifying that the public profile page (`/u/{username}`) shows only public personas, and confirming that access tokens can be regenerated from the dashboard.
+
+### 5.2 Testing Approach
 
 I wrote 52 automated tests using pytest. Rather than testing with the live PostgreSQL database, the tests run against an in-memory SQLite database. This has two advantages: the tests are fast (no network or disk I/O), and each test starts with a completely fresh database, so there is no risk of one test affecting another.
 
@@ -352,7 +352,7 @@ The test setup uses fixtures, reusable pieces of test state. For example, a `sam
 
 All tests interact with the API through FastAPI's `TestClient`, which simulates HTTP requests without starting a real server. This means I am testing the full request-response cycle (routing, validation, database operations, response serialisation) without the overhead of a running server.
 
-### 5.2 What the Tests Cover
+### 5.3 What the Tests Cover
 
 The 52 tests are organised into the following groups, as shown in Table 3.
 
@@ -376,7 +376,7 @@ The 52 tests are organised into the following groups, as shown in Table 3.
 | Privacy Boundaries | 2 | Recruiter scenario (only sees public), contextual identity (same user, different responses) |
 | Data Integrity | 3 | Maps directly to the success criteria from section 3.7 |
 
-### 5.3 Results Against Success Criteria
+### 5.4 Results Against Success Criteria
 
 In section 3.7, I defined three concrete success criteria. Here is how the tests validate each one:
 
@@ -386,7 +386,7 @@ In section 3.7, I defined three concrete success criteria. Here is how the tests
 
 **Data Integrity ("Deleting a User must cascade and remove all associated Personas"):** The `test_delete_user_deletes_all_personas` test creates a user with personas, deletes the user, and verifies that both personas return 404.
 
-### 5.4 Limitations and Improvement Plan
+### 5.5 Limitations and Improvement Plan
 
 The project meets the success criteria I defined, but working through the implementation exposed several weaknesses. For each one, I describe the problem, why it matters, and how I would concretely fix it.
 
