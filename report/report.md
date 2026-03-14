@@ -306,6 +306,10 @@ One design decision I am happy with is the JSON `data` field on personas. Instea
 
 Each persona type has completely different fields, and the system handles them all the same way. The trade-off is that I cannot query or index individual JSON fields at the database level, but for this use case that is acceptable, the data is always accessed as a whole blob attached to a persona.
 
+### 4.7 Automated Test Suite Architecture
+
+To ensure the API functions correctly, I implemented 52 automated tests using pytest. A key implementation detail is the use of `pytest` fixtures to manage test state efficiently. For example, a `sample_user` fixture creates a user object in the database before a test runs, and a `sample_user_with_personas` fixture sets up both public and private personas. This pattern kept the 52 individual test functions completely focused on asserting the API response logic, rather than repeating database setup boilerplate.
+
 ---
 
 ## 5. Evaluation
@@ -314,9 +318,9 @@ Each persona type has completely different fields, and the system handles them a
 
 #### Why Automated Testing
 
-The core product is a REST API designed primarily for machine consumption. Unlike a user-facing GUI where subjective usability matters, an API either behaves correctly or it does not, making automated assertions the natural fit. I considered other evaluation methods: user testing would be appropriate if the web interface were the primary product, but since the API is the main deliverable, functional correctness matters more than subjective experience. Expert review could be valuable for security auditing, but at this stage the priority is verifying that the privacy model works as designed.
+The core product is a REST API designed primarily for machine consumption. Unlike a user-facing GUI where subjective usability matters, an API either behaves correctly or it does not, making automated assertions the natural fit. I considered other evaluation methods: user testing would be appropriate if the web interface were the primary product, but since the API is the main deliverable, functional correctness matters more than subjective experience. Expert review could be valuable for security auditing, but the priority for this project is verifying that the privacy model works as designed.
 
-The test suite uses pytest and FastAPI's TestClient to simulate real HTTP requests and verify the expected responses. Tests run against an in-memory SQLite database, ensuring isolation (each test starts clean) and speed (no external dependencies).
+The test suite uses pytest and FastAPI's TestClient to simulate real HTTP requests and verify the expected responses. Tests run against an in-memory SQLite database, ensuring isolation (each test starts clean without risking orphaned data in a live database) and speed (minimizing network and disk I/O).
 
 #### Success Criteria
 
@@ -338,19 +342,9 @@ In addition to unit-level criteria, the test suite includes two scenario tests t
 
 - **Contextual Identity Scenario:** The same user is queried by two different callers, one without a token and one with a valid access token. The test verifies that they receive different responses from the same system, proving that the API supports contextual identity projection.
 
-#### Web Interface Verification
+### 5.2 API Verification (Automated Testing)
 
-The web interface is evaluated through manual walkthrough testing, covering: user registration and login flow, creating and editing personas from the dashboard, toggling persona visibility between public and private, verifying that the public profile page (`/u/{username}`) shows only public personas, and confirming that access tokens can be regenerated from the dashboard.
-
-### 5.2 Testing Approach
-
-I wrote 52 automated tests using pytest. Rather than testing with the live PostgreSQL database, the tests run against an in-memory SQLite database. This has two advantages: the tests are fast (no network or disk I/O), and each test starts with a completely fresh database, so there is no risk of one test affecting another.
-
-The test setup uses fixtures, reusable pieces of test state. For example, a `sample_user` fixture creates a user before the test runs, and a `sample_user_with_personas` fixture creates a user with both a public and a private persona. This keeps the individual test functions focused on what they are actually testing.
-
-All tests interact with the API through FastAPI's `TestClient`, which simulates HTTP requests without starting a real server. This means I am testing the full request-response cycle (routing, validation, database operations, response serialisation) without the overhead of a running server.
-
-### 5.3 What the Tests Cover
+#### 5.2.1 What the Tests Cover
 
 The 52 tests are organised into the following groups, as shown in Table 3.
 
@@ -374,7 +368,7 @@ The 52 tests are organised into the following groups, as shown in Table 3.
 | Privacy Boundaries | 2 | Recruiter scenario (only sees public), contextual identity (same user, different responses) |
 | Data Integrity | 3 | Maps directly to the success criteria from section 5.1 |
 
-### 5.4 Results Against Success Criteria
+### 5.2.2 Results Against Success Criteria
 
 In section 5.1, I defined three concrete success criteria. Here is how the tests validate each one:
 
@@ -384,7 +378,28 @@ In section 5.1, I defined three concrete success criteria. Here is how the tests
 
 **Data Integrity ("Deleting a User must cascade and remove all associated Personas"):** The `test_delete_user_deletes_all_personas` test creates a user with personas, deletes the user, and verifies that both personas return 404.
 
-### 5.5 Limitations and Future Improvements
+### 5.3 Web Interface Verification (Manual Walkthrough)
+
+The web interface is evaluated through manual walkthrough testing. Since the API's functional correctness is proven by the automated test suite, the goal of this manual evaluation is to prove that the graphical interface successfully translates those privacy controls to the end user. 
+
+The evaluation covers the core user journey:
+
+**Step 1: User Registration and Dashboard**
+Testing confirmed that the registration and login flow (using session-based cookies) functions correctly. Upon login, the dashboard successfully aggregates and displays all of the user's personas, regardless of visibility status.
+*(Insert Screenshot 1: The user dashboard showing a mix of public and private personas)*
+
+**Step 2: Persona Creation and Privacy Toggling**
+The evaluation verified that users can create new personas and edit existing ones. Crucially, the visibility toggle (Public vs. Private switch) operates as expected. 
+*(Insert Screenshot 2: The 'Create/Edit Persona' form highlighting the privacy toggle switch)*
+
+**Step 3: Verifying the Public Context Boundary (Critical Evaluation)**
+To definitively prove that the system solves the "Context Collapse" problem identified in the project aims, the public profile page (`/u/{username}`) was evaluated from the perspective of an unauthenticated visitor. The test was highly successful: the public profile rendered *only* the personas marked as public, while completely omitting any trace of the private personas visible on the user's internal dashboard. 
+*(Insert Screenshot 3: The public /u/username profile, visually proving the private personas are hidden)*
+
+**Step 4: Token Management**
+Finally, testing confirmed that users can manually regenerate access tokens from the dashboard, which successfully invalidates the old token for API access.
+
+### 5.4 Limitations and Future Improvements
 
 The project meets the success criteria I defined, but working through the implementation exposed several weaknesses. For each one, I describe the problem, why it matters, and how I would concretely fix it.
 
@@ -418,7 +433,7 @@ The current system allows users to create multiple personas, each with its own s
 
 ### 6.2 What I Would Do Next
 
-The improvements I identified in section 5.5 fall into a natural priority order. First, the security fixes (bcrypt migration and rate limiting) because they are high-impact and low-effort, both can be done without changing the application's architecture. Second, the `main.py` refactor, because the pattern is already established with the web routes and it would make the codebase easier to extend. Third, the Cognito integration, which is the largest change but is deliberately decoupled from the persona logic.
+The improvements I identified in section 5.4 fall into a natural priority order. First, the security fixes (bcrypt migration and rate limiting) because they are high-impact and low-effort, both can be done without changing the application's architecture. Second, the `main.py` refactor, because the pattern is already established with the web routes and it would make the codebase easier to extend. Third, the Cognito integration, which is the largest change but is deliberately decoupled from the persona logic.
 
 Beyond those fixes, the feature I would most want to add is **external platform connectors**, allowing a persona to pull data from external APIs automatically. For example, a Gamer persona could sync with Steam to display current stats, or a Professional persona could pull repositories from GitHub. This would move Plural from a static data store to a live identity aggregation layer, which is closer to the original vision described in section 1.3.
 
