@@ -8,7 +8,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
-from app.models import Persona, User
+from app.models import Context, Persona, User
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -57,6 +57,7 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
             "id": p.id,
             "name": p.name,
             "is_public": p.is_public,
+            "context": p.context,
             "data": deserialize_persona_data(p.data),
             "access_token": p.access_token,
         }
@@ -74,9 +75,10 @@ async def create_persona_page(request: Request, db: Session = Depends(get_db)):
     if not user:
         return RedirectResponse(url="/login", status_code=302)
 
+    contexts = db.query(Context).order_by(Context.name).all()
     return templates.TemplateResponse(
         request, "persona/create.html",
-        {"user": user}
+        {"user": user, "contexts": contexts}
     )
 
 
@@ -84,6 +86,7 @@ async def create_persona_page(request: Request, db: Session = Depends(get_db)):
 async def create_persona(
     request: Request,
     name: str = Form(...),
+    context_id: int = Form(...),
     is_public: str = Form(None),
     data_keys: List[str] = Form([]),
     data_values: List[str] = Form([]),
@@ -102,6 +105,7 @@ async def create_persona(
     persona = Persona(
         user_id=user.id,
         name=name,
+        context_id=context_id,
         is_public=is_public == "true",
         data=serialize_persona_data(data) if data else None,
     )
@@ -125,13 +129,15 @@ async def edit_persona_page(request: Request, persona_id: int, db: Session = Dep
         "id": persona.id,
         "name": persona.name,
         "is_public": persona.is_public,
+        "context_id": persona.context_id,
         "data": deserialize_persona_data(persona.data),
         "access_token": persona.access_token,
     }
 
+    contexts = db.query(Context).order_by(Context.name).all()
     return templates.TemplateResponse(
         request, "persona/edit.html",
-        {"user": user, "persona": persona_dict}
+        {"user": user, "persona": persona_dict, "contexts": contexts}
     )
 
 
@@ -140,6 +146,7 @@ async def edit_persona(
     request: Request,
     persona_id: int,
     name: str = Form(...),
+    context_id: int = Form(...),
     is_public: str = Form(None),
     data_keys: List[str] = Form([]),
     data_values: List[str] = Form([]),
@@ -160,6 +167,7 @@ async def edit_persona(
             data[key.strip()] = value.strip()
 
     persona.name = name
+    persona.context_id = context_id
     persona.is_public = is_public == "true"
     persona.data = serialize_persona_data(data) if data else None
     db.commit()

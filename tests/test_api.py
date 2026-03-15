@@ -199,15 +199,42 @@ class TestUserDelete:
         assert response.status_code == 404
 
 
+class TestContextList:
+    """Tests for GET /api/contexts."""
+
+    def test_list_contexts_empty(self, client):
+        response = client.get("/api/contexts")
+        assert response.status_code == 200
+        assert response.json() == []
+
+    def test_list_contexts_with_data(self, client, sample_contexts):
+        response = client.get("/api/contexts")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 3
+        # Should be sorted by name
+        names = [c["name"] for c in data]
+        assert names == sorted(names)
+
+    def test_context_response_fields(self, client, sample_contexts):
+        response = client.get("/api/contexts")
+        data = response.json()
+        context = data[0]
+        assert "id" in context
+        assert "name" in context
+        assert "description" in context
+
+
 class TestPersonaCreate:
     """Tests for POST /api/users/{user_id}/personas."""
 
-    def test_create_public_persona(self, client, sample_user):
+    def test_create_public_persona(self, client, sample_user, sample_contexts):
         response = client.post(
             f"/api/users/{sample_user['id']}/personas",
             json={
                 "name": "Gamer",
                 "is_public": True,
+                "context_id": sample_contexts["Gaming"].id,
                 "data": {"steam_id": "12345", "rank": "Diamond"}
             }
         )
@@ -217,13 +244,15 @@ class TestPersonaCreate:
         assert data["is_public"] is True
         assert data["data"]["steam_id"] == "12345"
         assert "access_token" in data  # Owner response includes token
+        assert data["context"]["name"] == "Gaming"
 
-    def test_create_private_persona(self, client, sample_user):
+    def test_create_private_persona(self, client, sample_user, sample_contexts):
         response = client.post(
             f"/api/users/{sample_user['id']}/personas",
             json={
                 "name": "Legal",
                 "is_public": False,
+                "context_id": sample_contexts["Legal"].id,
                 "data": {"ssn": "123-45-6789"}
             }
         )
@@ -233,27 +262,42 @@ class TestPersonaCreate:
         assert data["is_public"] is False
         assert "access_token" in data
 
-    def test_create_persona_user_not_found(self, client):
+    def test_create_persona_user_not_found(self, client, sample_contexts):
         response = client.post(
             "/api/users/99999/personas",
-            json={"name": "Test", "is_public": True}
+            json={"name": "Test", "is_public": True, "context_id": sample_contexts["Professional"].id}
         )
         assert response.status_code == 404
 
-    def test_create_persona_without_data(self, client, sample_user):
+    def test_create_persona_without_data(self, client, sample_user, sample_contexts):
         response = client.post(
             f"/api/users/{sample_user['id']}/personas",
-            json={"name": "Empty", "is_public": True}
+            json={"name": "Empty", "is_public": True, "context_id": sample_contexts["Professional"].id}
         )
         assert response.status_code == 201
         assert response.json()["data"] is None
 
-    def test_create_persona_name_too_short(self, client, sample_user):
+    def test_create_persona_name_too_short(self, client, sample_user, sample_contexts):
         response = client.post(
             f"/api/users/{sample_user['id']}/personas",
-            json={"name": "", "is_public": True}
+            json={"name": "", "is_public": True, "context_id": sample_contexts["Professional"].id}
         )
         assert response.status_code == 422
+
+    def test_create_persona_missing_context_id(self, client, sample_user):
+        response = client.post(
+            f"/api/users/{sample_user['id']}/personas",
+            json={"name": "Test", "is_public": True}
+        )
+        assert response.status_code == 422
+
+    def test_create_persona_invalid_context_id(self, client, sample_user):
+        response = client.post(
+            f"/api/users/{sample_user['id']}/personas",
+            json={"name": "Test", "is_public": True, "context_id": 99999}
+        )
+        assert response.status_code == 400
+        assert response.json()["detail"] == "Context not found"
 
 
 class TestPersonaList:
@@ -273,6 +317,30 @@ class TestPersonaList:
         # Should only show public personas
         assert len(data) == 1
         assert data[0]["name"] == "Professional"
+
+    def test_list_personas_filter_by_context(self, client, sample_user_with_personas):
+        user_id = sample_user_with_personas["user"]["id"]
+
+        # Filter by Professional context — should return the public persona
+        response = client.get(f"/api/users/{user_id}/personas?context=Professional")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["name"] == "Professional"
+
+    def test_list_personas_filter_by_context_case_insensitive(self, client, sample_user_with_personas):
+        user_id = sample_user_with_personas["user"]["id"]
+
+        response = client.get(f"/api/users/{user_id}/personas?context=professional")
+        assert response.status_code == 200
+        assert len(response.json()) == 1
+
+    def test_list_personas_filter_by_nonexistent_context(self, client, sample_user_with_personas):
+        user_id = sample_user_with_personas["user"]["id"]
+
+        response = client.get(f"/api/users/{user_id}/personas?context=Nonexistent")
+        assert response.status_code == 200
+        assert response.json() == []
 
     def test_list_personas_user_not_found(self, client):
         response = client.get("/api/users/99999/personas")
@@ -484,7 +552,7 @@ class TestCascadeDelete:
 class TestPrivacyBoundaries:
     """Tests for privacy enforcement - the core feature of the project."""
 
-    def test_recruiter_sees_only_professional_persona(self, client):
+    def test_recruiter_sees_only_professional_persona(self, client, sample_contexts):
         """
         Scenario: A recruiter views a user's profile.
         They should only see professional information, not personal/gaming.
@@ -501,6 +569,7 @@ class TestPrivacyBoundaries:
             json={
                 "name": "Professional",
                 "is_public": True,
+                "context_id": sample_contexts["Professional"].id,
                 "data": {"linkedin": "linkedin.com/in/test", "skills": ["Python"]}
             }
         )
@@ -511,6 +580,7 @@ class TestPrivacyBoundaries:
             json={
                 "name": "Gamer",
                 "is_public": True,
+                "context_id": sample_contexts["Gaming"].id,
                 "data": {"steam": "steamcommunity.com/id/test"}
             }
         )
@@ -521,6 +591,7 @@ class TestPrivacyBoundaries:
             json={
                 "name": "Legal",
                 "is_public": False,
+                "context_id": sample_contexts["Legal"].id,
                 "data": {"ssn": "123-45-6789", "real_name": "John Doe"}
             }
         ).json()
@@ -538,7 +609,7 @@ class TestPrivacyBoundaries:
         response = client.get(f"/api/personas/{legal['id']}")
         assert response.status_code == 403
 
-    def test_same_user_different_responses(self, client):
+    def test_same_user_different_responses(self, client, sample_contexts):
         """
         Scenario: Same user endpoint returns different data based on access context.
         This is the core "contextual identity" feature.
@@ -552,13 +623,13 @@ class TestPrivacyBoundaries:
         # Public persona
         public = client.post(
             f"/api/users/{user['id']}/personas",
-            json={"name": "Public", "is_public": True, "data": {"visible": True}}
+            json={"name": "Public", "is_public": True, "context_id": sample_contexts["Professional"].id, "data": {"visible": True}}
         ).json()
 
         # Private persona
         private = client.post(
             f"/api/users/{user['id']}/personas",
-            json={"name": "Private", "is_public": False, "data": {"secret": "data"}}
+            json={"name": "Private", "is_public": False, "context_id": sample_contexts["Legal"].id, "data": {"secret": "data"}}
         ).json()
 
         # Anonymous visitor sees only public

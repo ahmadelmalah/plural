@@ -32,11 +32,22 @@ class UserWithPersonas(UserResponse):
     personas: list["PersonaPublicResponse"] = []
 
 
+# ============== Context Schemas ==============
+
+class ContextResponse(BaseModel):
+    id: int
+    name: str
+    description: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 # ============== Persona Schemas ==============
 
 class PersonaBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     is_public: bool = False
+    context_id: int
     data: Optional[dict[str, Any]] = None
 
 
@@ -47,6 +58,7 @@ class PersonaCreate(PersonaBase):
 class PersonaUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=100)
     is_public: Optional[bool] = None
+    context_id: Optional[int] = None
     data: Optional[dict[str, Any]] = None
 
 
@@ -56,6 +68,7 @@ class PersonaPublicResponse(BaseModel):
     user_id: int
     name: str
     is_public: bool
+    context: Optional[ContextResponse] = None
     data: Optional[dict[str, Any]] = None
     created_at: datetime
     updated_at: datetime

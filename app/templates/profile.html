@@ -20,12 +20,32 @@
 
         <!-- Personas -->
         <div class="p-8">
+            {% if available_contexts and available_contexts | length > 1 %}
+                <div class="mb-6 flex flex-wrap gap-2">
+                    <a href="/u/{{ profile_user.username }}"
+                       class="px-3 py-1 rounded-full text-sm {{ 'bg-indigo-600 text-white' if not context_filter else 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}">
+                        All
+                    </a>
+                    {% for ctx in available_contexts %}
+                        <a href="/u/{{ profile_user.username }}?context={{ ctx }}"
+                           class="px-3 py-1 rounded-full text-sm {{ 'bg-indigo-600 text-white' if context_filter and context_filter|lower == ctx|lower else 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}">
+                            {{ ctx }}
+                        </a>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
             {% if personas %}
                 <div class="grid md:grid-cols-2 gap-6">
                     {% for persona in personas %}
                         <div class="border rounded-xl p-6 hover:shadow-md transition-shadow">
                             <div class="flex items-center justify-between mb-4">
-                                <h3 class="text-xl font-semibold text-gray-900">{{ persona.name }}</h3>
+                                <div>
+                                    <h3 class="text-xl font-semibold text-gray-900">{{ persona.name }}</h3>
+                                    {% if persona.context %}
+                                        <span class="text-xs text-indigo-600">{{ persona.context.name }}</span>
+                                    {% endif %}
+                                </div>
                                 <span class="px-2 py-1 text-xs bg-green-100 text-green-700 rounded-full">Public</span>
                             </div>
 

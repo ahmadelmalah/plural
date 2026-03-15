@@ -9,7 +9,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.database import Base
-from app.models import Persona, User
+from app.models import Context, Persona, User
 from main import app, get_db
 
 # Use in-memory SQLite for testing
@@ -56,6 +56,22 @@ def client(db_session):
 
 
 @pytest.fixture
+def sample_contexts(db_session):
+    """Create sample contexts and return them."""
+    contexts = [
+        Context(name="Professional", description="Work and career"),
+        Context(name="Gaming", description="Gaming profiles"),
+        Context(name="Legal", description="Legal identity"),
+    ]
+    for ctx in contexts:
+        db_session.add(ctx)
+    db_session.commit()
+    for ctx in contexts:
+        db_session.refresh(ctx)
+    return {ctx.name: ctx for ctx in contexts}
+
+
+@pytest.fixture
 def sample_user(client):
     """Create a sample user and return the response data."""
     response = client.post(
@@ -66,7 +82,7 @@ def sample_user(client):
 
 
 @pytest.fixture
-def sample_user_with_personas(client, sample_user):
+def sample_user_with_personas(client, sample_user, sample_contexts):
     """Create a user with both public and private personas."""
     user_id = sample_user["id"]
 
@@ -76,6 +92,7 @@ def sample_user_with_personas(client, sample_user):
         json={
             "name": "Professional",
             "is_public": True,
+            "context_id": sample_contexts["Professional"].id,
             "data": {"linkedin": "linkedin.com/in/test", "title": "Engineer"}
         }
     )
@@ -86,6 +103,7 @@ def sample_user_with_personas(client, sample_user):
         json={
             "name": "Legal",
             "is_public": False,
+            "context_id": sample_contexts["Legal"].id,
             "data": {"full_name": "Test User", "ssn": "123-45-6789"}
         }
     )
@@ -94,4 +112,5 @@ def sample_user_with_personas(client, sample_user):
         "user": sample_user,
         "public_persona": public_response.json(),
         "private_persona": private_response.json(),
+        "contexts": sample_contexts,
     }

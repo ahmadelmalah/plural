@@ -9,11 +9,12 @@ from sqladmin import Admin
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
-from app.admin import PersonaAdmin, UserAdmin
+from app.admin import ContextAdmin, PersonaAdmin, UserAdmin
 from app.database import SessionLocal, engine
-from app.models import Persona, User
+from app.models import Context, Persona, User
 from app.routes import auth, dashboard, profile
 from app.schemas import (
+    ContextResponse,
     ErrorResponse,
     PersonaCreate,
     PersonaOwnerResponse,
@@ -47,6 +48,7 @@ app.include_router(profile.router)
 admin = Admin(app, engine, title="Plural Admin")
 admin.add_view(UserAdmin)
 admin.add_view(PersonaAdmin)
+admin.add_view(ContextAdmin)
 
 
 def get_db():
@@ -73,6 +75,13 @@ def deserialize_persona_data(data: Optional[str]) -> Optional[dict]:
     return json.loads(data)
 
 
+def context_to_response(context: Context | None) -> ContextResponse | None:
+    """Convert Context model to response"""
+    if context is None:
+        return None
+    return ContextResponse(id=context.id, name=context.name, description=context.description)
+
+
 def persona_to_public_response(persona: Persona) -> PersonaPublicResponse:
     """Convert Persona model to public response (no access_token)"""
     return PersonaPublicResponse(
@@ -80,6 +89,7 @@ def persona_to_public_response(persona: Persona) -> PersonaPublicResponse:
         user_id=persona.user_id,
         name=persona.name,
         is_public=persona.is_public,
+        context=context_to_response(persona.context),
         data=deserialize_persona_data(persona.data),
         created_at=persona.created_at,
         updated_at=persona.updated_at,
@@ -93,6 +103,7 @@ def persona_to_owner_response(persona: Persona) -> PersonaOwnerResponse:
         user_id=persona.user_id,
         name=persona.name,
         is_public=persona.is_public,
+        context=context_to_response(persona.context),
         data=deserialize_persona_data(persona.data),
         access_token=persona.access_token,
         created_at=persona.created_at,
@@ -116,6 +127,15 @@ async def root(request: Request, db: Session = Depends(get_db)):
     if user:
         return RedirectResponse(url="/dashboard", status_code=302)
     return templates.TemplateResponse(request, "index.html", {"user": user})
+
+
+# ============== Context Endpoints ==============
+
+@app.get("/api/contexts", response_model=list[ContextResponse])
+def list_contexts(db: Session = Depends(get_db)):
+    """List all available contexts"""
+    contexts = db.query(Context).order_by(Context.name).all()
+    return [context_to_response(c) for c in contexts]
 
 
 # ============== User Endpoints ==============
@@ -244,10 +264,19 @@ def create_persona(user_id: int, persona_data: PersonaCreate, db: Session = Depe
             detail="User not found"
         )
 
+    # Validate context exists
+    context = db.query(Context).filter(Context.id == persona_data.context_id).first()
+    if not context:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Context not found"
+        )
+
     persona = Persona(
         user_id=user_id,
         name=persona_data.name,
         is_public=persona_data.is_public,
+        context_id=persona_data.context_id,
         data=serialize_persona_data(persona_data.data),
     )
     db.add(persona)
@@ -257,8 +286,12 @@ def create_persona(user_id: int, persona_data: PersonaCreate, db: Session = Depe
 
 
 @app.get("/api/users/{user_id}/personas", response_model=list[PersonaPublicResponse])
-def list_user_personas(user_id: int, db: Session = Depends(get_db)):
-    """List all public personas for a user"""
+def list_user_personas(
+    user_id: int,
+    context: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """List all public personas for a user, optionally filtered by context name"""
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(
@@ -268,6 +301,14 @@ def list_user_personas(user_id: int, db: Session = Depends(get_db)):
 
     # Only return public personas
     public_personas = [p for p in user.personas if p.is_public]
+
+    # Filter by context name if provided
+    if context:
+        public_personas = [
+            p for p in public_personas
+            if p.context and p.context.name.lower() == context.lower()
+        ]
+
     return [persona_to_public_response(p) for p in public_personas]
 
 
@@ -336,6 +377,14 @@ def update_persona(
         persona.name = persona_data.name
     if persona_data.is_public is not None:
         persona.is_public = persona_data.is_public
+    if persona_data.context_id is not None:
+        context = db.query(Context).filter(Context.id == persona_data.context_id).first()
+        if not context:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Context not found"
+            )
+        persona.context_id = persona_data.context_id
     if persona_data.data is not None:
         persona.data = serialize_persona_data(persona_data.data)
 

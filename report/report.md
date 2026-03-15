@@ -32,7 +32,7 @@ However, while these dimensions are distinct in function, focus and interest the
 
 ### 1.4 Solution Overview
 
-The project aims for implementing a centralized place for orchestrating the digital multidimensional identity, by allowing the users to manage the identity as an aggregation of distinct personas, each persona represents a particular dimension (e.g. Legal, Reader, Gamer, Worker), and has its own set of attributes and relevant in a certain context, each persona is set to be public or private (protected access)
+The project aims for implementing a centralized place for orchestrating the digital multidimensional identity, by allowing the users to manage the identity as an aggregation of distinct personas. Each persona belongs to a **Context**, an identity dimension (e.g. Professional, Gaming, Legal) that categorises what aspect of the user's life this persona represents. A persona has its own set of attributes relevant to that context, and is set to be either public or private (protected access). Both the API and the web interface support filtering personas by context, so a recruiter can query only the "Professional" context while a gaming friend can view the "Gaming" context.
 
 Each user will have a general profile that presents all of the user's public personas and what they want to share about themselves (e.g., professional persona, reader persona, gamer persona), while strictly hiding confidential personas (e.g., legal persona).
 
@@ -140,7 +140,7 @@ While the previous sections covered infrastructure-level solutions, there is als
 
 ### 3.1 Project Overview
 
-This project is a web application called **Plural** that allows users to manage multiple digital personas from a single account. The core concept is simple: a user signs up once, and then creates as many personas as they need, each representing a different dimension of their identity (e.g., "Professional," "Gamer," "Legal"). Each persona has its own set of attributes (stored as flexible JSON data) and a visibility setting: **public** (visible to anyone) or **private** (accessible only with a secret access token).
+This project is a web application called **Plural** that allows users to manage multiple digital personas from a single account. The core concept is simple: a user signs up once, and then creates as many personas as they need. Each persona belongs to a **Context** (e.g., "Professional," "Gaming," "Legal"), which represents a specific dimension of the user's identity. A persona has its own set of attributes (stored as flexible JSON data) and a visibility setting: **public** (visible to anyone) or **private** (accessible only with a secret access token). Visitors can filter a user's public personas by context, viewing only the dimension relevant to them.
 
 The system has two interfaces:
 
@@ -206,10 +206,11 @@ The following sections describe the key technical decisions I made and the reaso
 
 ### 3.5 Database Design
 
-I decided to start with two main tables representing the two main entities we have:
+I decided to start with three main tables representing the core entities:
 
 - **Users Table:** The biological entity/account holder
-- **Personas Table:** The dimension or the projection for a certain context (e.g. A single user could have a gamer persona, a reader persona, a legal persona, and a professional persona)
+- **Contexts Table:** The identity dimension that a persona belongs to (e.g. Professional, Gaming, Legal). Contexts define the categories of identity; personas are the user's specific projection within that category
+- **Personas Table:** The dimension or the projection for a certain context (e.g. A single user could have a gamer persona, a reader persona, a legal persona, and a professional persona). Each persona must belong to exactly one context
 
 #### Users Table
 
@@ -224,15 +225,28 @@ I decided to start with two main tables representing the two main entities we ha
 | created_at | The registration date of the user |
 | updated_at | Last time the user has updated their information |
 
+#### Contexts Table
+
+**Table 2:** Contexts Table Schema
+
+| Column | Description |
+|--------|-------------|
+| id | Table Primary Key |
+| name | The name of the identity dimension (e.g. Professional, Gaming, Legal). Must be unique |
+| description | An optional description of what this context represents |
+| created_at | When was the context created |
+| updated_at | When was the context last updated |
+
 #### Personas Table
 
-**Table 2:** Personas Table Schema
+**Table 3:** Personas Table Schema
 
 | Column | Description |
 |--------|-------------|
 | id | Table Primary Key |
 | user_id | A foreign key to link the persona with a user (One to many relationship) |
-| name | Name of the persona (e.g. reader, gamer, legal) |
+| context_id | A foreign key to link the persona with a context (Many to one relationship). Every persona must belong to a context |
+| name | Name of the persona (e.g. Freelancer, Dota 2 Player, Designer) |
 | is_public | Determines of the persona is publicly accessible for all visitors |
 | access_token | Required if the persona is private, which is a security key used to access the persona |
 | Data | The actual unique attributes and values of this persona, this field is JSON to keep it flexible; for example a gamer persona could have Steam ID while a professional persona could have linkedin profile or Github account |

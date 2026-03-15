@@ -1,6 +1,6 @@
 from sqladmin import ModelView
 
-from app.models import Persona, User
+from app.models import Context, Persona, User
 
 
 class UserAdmin(ModelView, model=User):
@@ -11,6 +11,16 @@ class UserAdmin(ModelView, model=User):
     name = "User"
     name_plural = "Users"
     icon = "fa-solid fa-user"
+
+
+class ContextAdmin(ModelView, model=Context):
+    column_list = [Context.id, Context.name, Context.description, Context.created_at]
+    column_searchable_list = [Context.name]
+    column_sortable_list = [Context.id, Context.name, Context.created_at]
+    column_default_sort = ("name", False)
+    name = "Context"
+    name_plural = "Contexts"
+    icon = "fa-solid fa-layer-group"
 
 
 class PersonaAdmin(ModelView, model=Persona):

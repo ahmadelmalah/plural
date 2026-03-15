@@ -19,7 +19,12 @@
             <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
                 <div class="p-6">
                     <div class="flex items-start justify-between mb-4">
-                        <h3 class="text-xl font-semibold text-gray-900">{{ persona.name }}</h3>
+                        <div>
+                            <h3 class="text-xl font-semibold text-gray-900">{{ persona.name }}</h3>
+                            {% if persona.context %}
+                                <span class="text-xs text-indigo-600">{{ persona.context.name }}</span>
+                            {% endif %}
+                        </div>
                         <span class="px-2 py-1 text-xs rounded-full {% if persona.is_public %}bg-green-100 text-green-700{% else %}bg-gray-100 text-gray-600{% endif %}">
                             {{ 'Public' if persona.is_public else 'Private' }}
                         </span>

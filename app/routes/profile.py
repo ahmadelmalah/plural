@@ -35,7 +35,12 @@ def deserialize_persona_data(data: str | None) -> dict | None:
 
 
 @router.get("/u/{username}")
-async def public_profile(request: Request, username: str, db: Session = Depends(get_db)):
+async def public_profile(
+    request: Request,
+    username: str,
+    context: str | None = None,
+    db: Session = Depends(get_db)
+):
     current_user = get_current_user(request, db)
 
     profile_user = db.query(User).filter(User.username == username).first()
@@ -46,6 +51,8 @@ async def public_profile(request: Request, username: str, db: Session = Depends(
                 "user": current_user,
                 "profile_user": {"username": username},
                 "personas": [],
+                "available_contexts": [],
+                "context_filter": None,
                 "not_found": True
             },
             status_code=404
@@ -54,12 +61,25 @@ async def public_profile(request: Request, username: str, db: Session = Depends(
     # Only show public personas
     public_personas = [p for p in profile_user.personas if p.is_public]
 
+    # Collect unique context names from public personas (for filter buttons)
+    available_contexts = sorted(set(
+        p.context.name for p in public_personas if p.context
+    ))
+
+    # Filter by context name if provided
+    if context:
+        public_personas = [
+            p for p in public_personas
+            if p.context and p.context.name.lower() == context.lower()
+        ]
+
     personas = []
     for p in public_personas:
         persona_dict = {
             "id": p.id,
             "name": p.name,
             "is_public": p.is_public,
+            "context": p.context,
             "data": deserialize_persona_data(p.data),
         }
         personas.append(persona_dict)
@@ -69,6 +89,8 @@ async def public_profile(request: Request, username: str, db: Session = Depends(
         {
             "user": current_user,
             "profile_user": profile_user,
-            "personas": personas
+            "personas": personas,
+            "available_contexts": available_contexts,
+            "context_filter": context,
         }
     )
