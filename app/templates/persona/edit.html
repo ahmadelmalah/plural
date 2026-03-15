@@ -92,26 +92,34 @@
     </div>
 
     <!-- Access Token Section -->
-    <div class="bg-white p-8 rounded-xl shadow-sm border mt-6">
+    <div id="token-section" class="bg-white p-8 rounded-xl shadow-sm border mt-6" style="{{ 'display: none;' if persona.is_public else '' }}">
         <h3 class="text-lg font-semibold mb-4">Access Token</h3>
         <p class="text-sm text-gray-600 mb-4">Use this token to access private personas via the API.</p>
 
-        <div class="flex items-center space-x-2 mb-4">
-            <code class="flex-1 p-3 bg-gray-100 rounded-lg text-sm font-mono overflow-x-auto">{{ persona.access_token }}</code>
-            <button onclick="copyToken()" class="px-3 py-2 text-indigo-600 hover:bg-indigo-50 rounded-lg text-sm">
-                Copy
-            </button>
-        </div>
+        {% if persona.access_token %}
+            <div class="flex items-center space-x-2 mb-4">
+                <code class="flex-1 p-3 bg-gray-100 rounded-lg text-sm font-mono overflow-x-auto">{{ persona.access_token }}</code>
+                <button onclick="copyToken()" class="px-3 py-2 text-indigo-600 hover:bg-indigo-50 rounded-lg text-sm">
+                    Copy
+                </button>
+            </div>
 
-        <form method="POST" action="/personas/{{ persona.id }}/regenerate-token" onsubmit="return confirm('Regenerate token? The old token will stop working.')">
-            <button type="submit" class="text-sm text-red-600 hover:text-red-700">
-                Regenerate Token
-            </button>
-        </form>
+            <form method="POST" action="/personas/{{ persona.id }}/regenerate-token" onsubmit="return confirm('Regenerate token? The old token will stop working.')">
+                <button type="submit" class="text-sm text-red-600 hover:text-red-700">
+                    Regenerate Token
+                </button>
+            </form>
+        {% else %}
+            <p class="text-sm text-gray-500 italic">A token will be generated after you save with Private visibility.</p>
+        {% endif %}
     </div>
 </div>
 
 <script>
+document.getElementById('is_public').addEventListener('change', function() {
+    document.getElementById('token-section').style.display = this.value === 'true' ? 'none' : '';
+});
+
 function addRow() {
     const container = document.getElementById('data-fields');
     const row = document.createElement('div');

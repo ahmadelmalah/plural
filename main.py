@@ -1,4 +1,5 @@
 import json
+import secrets
 from typing import Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
@@ -276,6 +277,7 @@ def create_persona(user_id: int, persona_data: PersonaCreate, db: Session = Depe
         user_id=user_id,
         name=persona_data.name,
         is_public=persona_data.is_public,
+        access_token=None if persona_data.is_public else secrets.token_urlsafe(32),
         context_id=persona_data.context_id,
         data=serialize_persona_data(persona_data.data),
     )
@@ -377,6 +379,10 @@ def update_persona(
         persona.name = persona_data.name
     if persona_data.is_public is not None:
         persona.is_public = persona_data.is_public
+        if persona_data.is_public:
+            persona.access_token = None
+        else:
+            persona.access_token = secrets.token_urlsafe(32)
     if persona_data.context_id is not None:
         context = db.query(Context).filter(Context.id == persona_data.context_id).first()
         if not context:

@@ -102,11 +102,13 @@ async def create_persona(
         if key.strip() and value.strip():
             data[key.strip()] = value.strip()
 
+    public = is_public == "true"
     persona = Persona(
         user_id=user.id,
         name=name,
         context_id=context_id,
-        is_public=is_public == "true",
+        is_public=public,
+        access_token=None if public else secrets.token_urlsafe(32),
         data=serialize_persona_data(data) if data else None,
     )
     db.add(persona)
@@ -168,7 +170,10 @@ async def edit_persona(
 
     persona.name = name
     persona.context_id = context_id
-    persona.is_public = is_public == "true"
+    new_public = is_public == "true"
+    if new_public != persona.is_public:
+        persona.access_token = None if new_public else secrets.token_urlsafe(32)
+    persona.is_public = new_public
     persona.data = serialize_persona_data(data) if data else None
     db.commit()
 

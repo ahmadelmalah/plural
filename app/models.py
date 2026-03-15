@@ -42,7 +42,7 @@ class Persona(Base):
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     is_public: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    access_token: Mapped[Optional[str]] = mapped_column(String(64), default=generate_access_token, nullable=True)
+    access_token: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     context_id: Mapped[int] = mapped_column(Integer, ForeignKey("contexts.id"), nullable=False)
     data: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON stored as text
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)

@@ -278,7 +278,7 @@ The API is the core deliverable of the project. I implemented two groups of endp
 
 **User endpoints** handle the account lifecycle, creating, listing, reading, updating, and deleting users. When you fetch a user's profile via `GET /api/users/{id}`, the response includes only their public personas. Private personas are filtered out at the application level before the response is sent.
 
-**Persona endpoints** handle creating, reading, updating, and deleting personas. Each persona belongs to a user and has its own access token. Creating a persona returns the access token to the owner; after that, any mutation (update, delete, token regeneration) requires presenting the correct token in the `X-Access-Token` header.
+**Persona endpoints** handle creating, reading, updating, and deleting personas. Each persona belongs to a user. When a private persona is created, the system generates a unique access token and returns it to the owner; public personas do not receive a token since they are accessible to everyone. Any mutation on a private persona (update, delete, token regeneration) requires presenting the correct token in the `X-Access-Token` header.
 
 I also defined separate Pydantic response models: `PersonaPublicResponse` excludes the `access_token` field entirely, while `PersonaOwnerResponse` includes it. This means even if I make a mistake in the endpoint logic, Pydantic will strip the token from any public-facing response, a second layer of defence that I did not have with Flask.
 
@@ -286,7 +286,7 @@ I also defined separate Pydantic response models: `PersonaPublicResponse` exclud
 
 This is the core logic of the project, the part that makes it more than a basic CRUD API. The privacy model works as follows:
 
-Each persona has two relevant fields: `is_public` (a boolean) and `access_token` (a randomly generated string). When someone requests a persona via the API:
+Each persona has two relevant fields: `is_public` (a boolean) and `access_token` (a randomly generated string, only present for private personas; public personas have no token). When someone requests a persona via the API:
 
 1. If `is_public` is `True`, the persona data is returned to anyone
 2. If `is_public` is `False`, the API checks for an `X-Access-Token` header
@@ -404,8 +404,8 @@ Testing confirmed that the registration and login flow (using session-based cook
 *(Insert Screenshot 1: The user dashboard showing a mix of public and private personas)*
 
 **Step 2: Persona Creation and Privacy Toggling**
-The evaluation verified that users can create new personas and edit existing ones. Crucially, the visibility toggle (Public vs. Private switch) operates as expected. 
-*(Insert Screenshot 2: The 'Create/Edit Persona' form highlighting the privacy toggle switch)*
+The evaluation verified that users can create new personas and edit existing ones. The visibility is controlled via a dropdown menu where the user selects "Public" or "Private." When set to private, the edit page displays the Access Token section with copy and regenerate options; when switched to public, this section is hidden since public personas do not need tokens.
+*(Insert Screenshot 2: The 'Create/Edit Persona' form highlighting the visibility dropdown)*
 
 **Step 3: Verifying the Public Context Boundary (Critical Evaluation)**
 To definitively prove that the system solves the "Context Collapse" problem identified in the project aims, the public profile page (`/u/{username}`) was evaluated from the perspective of an unauthenticated visitor. The test was highly successful: the public profile rendered *only* the personas marked as public, while completely omitting any trace of the private personas visible on the user's internal dashboard. Context filter buttons on the profile page allow visitors to narrow the view by context, so a recruiter selecting "Professional" sees only professionally relevant personas while gaming personas are hidden from that view. Clicking a persona card navigates to a dedicated detail page (`/u/{username}/{persona_id}`) showing its full attributes.

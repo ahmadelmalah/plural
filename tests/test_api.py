@@ -243,7 +243,7 @@ class TestPersonaCreate:
         assert data["name"] == "Gamer"
         assert data["is_public"] is True
         assert data["data"]["steam_id"] == "12345"
-        assert "access_token" in data  # Owner response includes token
+        assert data["access_token"] is None  # Public personas don't need a token
         assert data["context"]["name"] == "Gaming"
 
     def test_create_private_persona(self, client, sample_user, sample_contexts):
@@ -393,7 +393,7 @@ class TestPersonaUpdate:
     """Tests for PUT /api/personas/{persona_id}."""
 
     def test_update_persona_name(self, client, sample_user_with_personas):
-        persona = sample_user_with_personas["public_persona"]
+        persona = sample_user_with_personas["private_persona"]
         response = client.put(
             f"/api/personas/{persona['id']}",
             headers={"X-Access-Token": persona["access_token"]},
@@ -403,17 +403,18 @@ class TestPersonaUpdate:
         assert response.json()["name"] == "Work"
 
     def test_update_persona_visibility(self, client, sample_user_with_personas):
-        persona = sample_user_with_personas["public_persona"]
+        persona = sample_user_with_personas["private_persona"]
         response = client.put(
             f"/api/personas/{persona['id']}",
             headers={"X-Access-Token": persona["access_token"]},
-            json={"is_public": False}
+            json={"is_public": True}
         )
         assert response.status_code == 200
-        assert response.json()["is_public"] is False
+        assert response.json()["is_public"] is True
+        assert response.json()["access_token"] is None  # Token cleared when made public
 
     def test_update_persona_data(self, client, sample_user_with_personas):
-        persona = sample_user_with_personas["public_persona"]
+        persona = sample_user_with_personas["private_persona"]
         response = client.put(
             f"/api/personas/{persona['id']}",
             headers={"X-Access-Token": persona["access_token"]},
@@ -423,7 +424,7 @@ class TestPersonaUpdate:
         assert response.json()["data"]["new_field"] == "new_value"
 
     def test_update_persona_without_token(self, client, sample_user_with_personas):
-        persona = sample_user_with_personas["public_persona"]
+        persona = sample_user_with_personas["private_persona"]
         response = client.put(
             f"/api/personas/{persona['id']}",
             json={"name": "Updated"}
@@ -431,7 +432,7 @@ class TestPersonaUpdate:
         assert response.status_code == 422  # Missing required header
 
     def test_update_persona_invalid_token(self, client, sample_user_with_personas):
-        persona = sample_user_with_personas["public_persona"]
+        persona = sample_user_with_personas["private_persona"]
         response = client.put(
             f"/api/personas/{persona['id']}",
             headers={"X-Access-Token": "wrong-token"},
@@ -452,7 +453,7 @@ class TestPersonaDelete:
     """Tests for DELETE /api/personas/{persona_id}."""
 
     def test_delete_persona_success(self, client, sample_user_with_personas):
-        persona = sample_user_with_personas["public_persona"]
+        persona = sample_user_with_personas["private_persona"]
         response = client.delete(
             f"/api/personas/{persona['id']}",
             headers={"X-Access-Token": persona["access_token"]}
@@ -464,12 +465,12 @@ class TestPersonaDelete:
         assert response.status_code == 404
 
     def test_delete_persona_without_token(self, client, sample_user_with_personas):
-        persona = sample_user_with_personas["public_persona"]
+        persona = sample_user_with_personas["private_persona"]
         response = client.delete(f"/api/personas/{persona['id']}")
         assert response.status_code == 422
 
     def test_delete_persona_invalid_token(self, client, sample_user_with_personas):
-        persona = sample_user_with_personas["public_persona"]
+        persona = sample_user_with_personas["private_persona"]
         response = client.delete(
             f"/api/personas/{persona['id']}",
             headers={"X-Access-Token": "wrong-token"}
