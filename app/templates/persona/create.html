@@ -39,11 +39,12 @@
             </div>
 
             <div class="mb-4">
-                <label class="flex items-center">
-                    <input type="checkbox" name="is_public" value="true" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                        {{ 'checked' if is_public else '' }}>
-                    <span class="ml-2 text-sm text-gray-700">Make this persona public</span>
-                </label>
+                <label for="is_public" class="block text-sm font-medium text-gray-700 mb-1">Visibility</label>
+                <select id="is_public" name="is_public" required
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                    <option value="true" {{ 'selected' if is_public is not defined or is_public else '' }}>Public</option>
+                    <option value="false" {{ 'selected' if is_public is defined and not is_public else '' }}>Private</option>
+                </select>
                 <p class="mt-1 text-xs text-gray-500">Public personas are visible on your profile. Private personas require an access token.</p>
             </div>
 
