@@ -56,7 +56,7 @@ While the application could integrate with external systems like IAM and SSO ser
 
 ### 1.6 Motivation
 
-**Personal Motivation:** I am deeply interested in backend web development, data, security and identity management systems, I enjoy building APIs that could be used and integrated in different systems, I enjoy system integration. My passion lies in the challenge of system integration: building secure, scalable APIs that act as bridges between disconnected platforms. For me, this project is not just a requirement; it is an opportunity to build the kind of structural, data-driven tool that I personally enjoy using.
+**Personal Motivation:** I am deeply interested in backend web development, security and identity management systems. My passion lies in building secure, scalable APIs that act as bridges between disconnected platforms. For me, this project is not just a requirement; it is an opportunity to build the kind of structural, data-driven tool that I personally enjoy using.
 
 **Domain Opportunity:** The current software market is already saturated with strong solutions for Authentication ("Who are you?") and Authorization ("What are you allowed to do?") [3][4][5]. However, there is a significant gap when it comes to Representation ("How do you appear in this context?").
 
