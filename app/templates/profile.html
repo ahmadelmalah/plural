@@ -38,8 +38,8 @@
             {% if personas %}
                 <div class="grid md:grid-cols-2 gap-6">
                     {% for persona in personas %}
-                        <div class="border rounded-xl p-6 hover:shadow-md transition-shadow">
-                            <div class="flex items-center justify-between mb-4">
+                        <a href="/u/{{ profile_user.username }}/{{ persona.id }}" class="block border rounded-xl p-6 hover:shadow-md transition-shadow">
+                            <div class="flex items-center justify-between mb-2">
                                 <div>
                                     <h3 class="text-xl font-semibold text-gray-900">{{ persona.name }}</h3>
                                     {% if persona.context %}
@@ -48,32 +48,12 @@
                                 </div>
                                 <span class="px-2 py-1 text-xs bg-green-100 text-green-700 rounded-full">Public</span>
                             </div>
-
                             {% if persona.data %}
-                                <div class="space-y-3">
-                                    {% for key, value in persona.data.items() %}
-                                        <div class="flex items-start">
-                                            <span class="text-sm text-gray-500 w-24 flex-shrink-0">{{ key }}</span>
-                                            {% if value is string and (value.startswith('http') or value.startswith('www') or '.com' in value or '.io' in value) %}
-                                                <a href="{{ value if value.startswith('http') else 'https://' + value }}" target="_blank" class="text-sm text-indigo-600 hover:text-indigo-700">
-                                                    {{ value }}
-                                                </a>
-                                            {% elif value is iterable and value is not string %}
-                                                <div class="flex flex-wrap gap-1">
-                                                    {% for item in value %}
-                                                        <span class="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">{{ item }}</span>
-                                                    {% endfor %}
-                                                </div>
-                                            {% else %}
-                                                <span class="text-sm text-gray-700">{{ value }}</span>
-                                            {% endif %}
-                                        </div>
-                                    {% endfor %}
-                                </div>
+                                <p class="text-sm text-gray-500">{{ persona.data | length }} data point{{ 's' if persona.data | length != 1 else '' }}</p>
                             {% else %}
                                 <p class="text-sm text-gray-500">No data available</p>
                             {% endif %}
-                        </div>
+                        </a>
                     {% endfor %}
                 </div>
             {% else %}

@@ -94,3 +94,64 @@ async def public_profile(
             "context_filter": context,
         }
     )
+
+
+@router.get("/u/{username}/{persona_id}")
+async def public_persona_detail(
+    request: Request,
+    username: str,
+    persona_id: int,
+    db: Session = Depends(get_db)
+):
+    current_user = get_current_user(request, db)
+
+    profile_user = db.query(User).filter(User.username == username).first()
+    if not profile_user:
+        return templates.TemplateResponse(
+            request, "profile.html",
+            {
+                "user": current_user,
+                "profile_user": {"username": username},
+                "personas": [],
+                "available_contexts": [],
+                "context_filter": None,
+                "not_found": True
+            },
+            status_code=404
+        )
+
+    # Find the public persona by ID (must belong to this user)
+    persona = next(
+        (p for p in profile_user.personas
+         if p.is_public and p.id == persona_id),
+        None
+    )
+
+    if not persona:
+        return templates.TemplateResponse(
+            request, "profile.html",
+            {
+                "user": current_user,
+                "profile_user": profile_user,
+                "personas": [],
+                "available_contexts": [],
+                "context_filter": None,
+                "not_found": True
+            },
+            status_code=404
+        )
+
+    persona_dict = {
+        "name": persona.name,
+        "context": persona.context,
+        "data": deserialize_persona_data(persona.data),
+    }
+
+    return templates.TemplateResponse(
+        request, "persona/detail.html",
+        {
+            "user": current_user,
+            "profile_user": profile_user,
+            "persona": persona_dict,
+        }
+    )

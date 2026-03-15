@@ -302,7 +302,7 @@ While the API is the primary product, I also built a web interface so that users
 
 - **Login/Signup pages:** Session-based authentication using cookies. When a user signs up, their password is hashed and stored. On login, the password is verified and a session cookie is set
 - **Dashboard:** After logging in, users see all their personas (both public and private) with options to create, edit, or delete them. They can also toggle visibility and regenerate access tokens
-- **Public Profile:** Each user has a shareable profile page at `/u/{username}` that shows only their public personas. This is what visitors see
+- **Public Profile:** Each user has a shareable profile page at `/u/{username}` that shows only their public personas, with filter buttons to narrow by context. Clicking a persona card opens a dedicated detail page at `/u/{username}/{id}` showing its full attributes. This is what visitors see
 
 All templates extend a base template (`base.html`) that provides the consistent layout and navigation.
 
@@ -322,7 +322,7 @@ Each persona type has completely different fields, and the system handles them a
 
 ### 4.7 Automated Test Suite Architecture
 
-To ensure the API functions correctly, I implemented 52 automated tests using pytest. A key implementation detail is the use of `pytest` fixtures to manage test state efficiently. For example, a `sample_user` fixture creates a user object in the database before a test runs, and a `sample_user_with_personas` fixture sets up both public and private personas. This pattern kept the 52 individual test functions completely focused on asserting the API response logic, rather than repeating database setup boilerplate.
+To ensure the API functions correctly, I implemented 60 automated tests using pytest. A key implementation detail is the use of `pytest` fixtures to manage test state efficiently. For example, a `sample_user` fixture creates a user object in the database before a test runs, and a `sample_user_with_personas` fixture sets up both public and private personas. This pattern kept the 60 individual test functions completely focused on asserting the API response logic, rather than repeating database setup boilerplate.
 
 ---
 
@@ -342,7 +342,7 @@ Each criterion is derived from the project aims defined in section 1.3:
 
 - **Privacy Enforcement (addresses the "Private Identity" goal):** The central promise of this project is that private personas are hidden from unauthorised access. To verify this, private personas must return `403 Forbidden` when accessed without a valid token. Tests cover three cases: no token provided, wrong token provided, and correct token provided, ensuring the privacy boundary holds in all scenarios.
 
-- **Contextual Identity (addresses the "context collapse" problem):** The project exists because current platforms show the same data to everyone. To verify that Plural solves this, the API must return distinct data for the same user depending on the access context. Tests verify that `GET /api/users/{id}` returns only public personas, while `GET /api/personas/{id}` with the correct `X-Access-Token` header returns private persona data. This directly tests whether the system prevents context collapse.
+- **Contextual Identity (addresses the "context collapse" problem):** The project exists because current platforms show the same data to everyone. To verify that Plural solves this, the API must return distinct data for the same user depending on the access context. Tests verify that `GET /api/users/{id}` returns only public personas, while `GET /api/personas/{id}` with the correct `X-Access-Token` header returns private persona data. Additionally, the `?context=` query parameter on the persona list endpoint allows callers to filter by context name (e.g., `?context=Professional`), so the same endpoint returns different subsets depending on the requested context. This directly tests whether the system prevents context collapse.
 
 - **Data Integrity:** Deleting a User must cascade and remove all associated Personas to prevent orphaned data. Tests create a user with multiple personas, delete the user, and verify all personas return `404 Not Found`.
 
@@ -360,9 +360,9 @@ In addition to unit-level criteria, the test suite includes two scenario tests t
 
 #### 5.2.1 What the Tests Cover
 
-The 52 tests are organised into the following groups, as shown in Table 3.
+The 60 tests are organised into the following groups, as shown in Table 4.
 
-**Table 3:** Automated Test Suite Coverage
+**Table 4:** Automated Test Suite Coverage
 
 | Test Group | Tests | What It Covers |
 |------------|-------|----------------|
@@ -372,8 +372,9 @@ The 52 tests are organised into the following groups, as shown in Table 3.
 | User Get | 3 | Success, not found, only public personas shown |
 | User Update | 5 | Email update, username update, not found, duplicate conflicts |
 | User Delete | 2 | Success, not found |
-| Persona Create | 5 | Public/private creation, user not found, without data, name too short |
-| Persona List | 3 | Empty, only public shown, user not found |
+| Context List | 3 | Empty list, list with data, response fields |
+| Persona Create | 7 | Public/private creation, user not found, without data, name too short, missing context_id, invalid context_id |
+| Persona List | 6 | Empty, only public shown, user not found, filter by context, case-insensitive filter, nonexistent context |
 | Persona Get | 5 | Public without token, private without token (403), valid token, invalid token, not found |
 | Persona Update | 6 | Name, visibility, data updates, missing/invalid token, not found |
 | Persona Delete | 4 | Success, missing/invalid token, not found |
@@ -407,7 +408,7 @@ The evaluation verified that users can create new personas and edit existing one
 *(Insert Screenshot 2: The 'Create/Edit Persona' form highlighting the privacy toggle switch)*
 
 **Step 3: Verifying the Public Context Boundary (Critical Evaluation)**
-To definitively prove that the system solves the "Context Collapse" problem identified in the project aims, the public profile page (`/u/{username}`) was evaluated from the perspective of an unauthenticated visitor. The test was highly successful: the public profile rendered *only* the personas marked as public, while completely omitting any trace of the private personas visible on the user's internal dashboard. 
+To definitively prove that the system solves the "Context Collapse" problem identified in the project aims, the public profile page (`/u/{username}`) was evaluated from the perspective of an unauthenticated visitor. The test was highly successful: the public profile rendered *only* the personas marked as public, while completely omitting any trace of the private personas visible on the user's internal dashboard. Context filter buttons on the profile page allow visitors to narrow the view by context, so a recruiter selecting "Professional" sees only professionally relevant personas while gaming personas are hidden from that view. Clicking a persona card navigates to a dedicated detail page (`/u/{username}/{persona_id}`) showing its full attributes.
 *(Insert Screenshot 3: The public /u/username profile, visually proving the private personas are hidden)*
 
 **Step 4: Token Management**
@@ -431,7 +432,7 @@ I deferred Cognito integration to focus on the persona logic, which was the righ
 
 **Monolithic API File (Maintainability - Medium Priority)**
 
-All API endpoints currently live in `main.py` (~400 lines). The web routes are already split into separate modules using FastAPI's `APIRouter`, so the pattern is established. The fix is to create `app/routes/api_users.py` and `app/routes/api_personas.py`, move the relevant endpoints, and include them via `app.include_router()`. This would reduce `main.py` to application setup only.
+All API endpoints currently live in `main.py` (~450 lines). The web routes are already split into separate modules using FastAPI's `APIRouter`, so the pattern is established. The fix is to create `app/routes/api_users.py` and `app/routes/api_personas.py`, move the relevant endpoints, and include them via `app.include_router()`. This would reduce `main.py` to application setup only.
 
 **No Frontend Validation (Usability - Low Priority)**
 
@@ -443,7 +444,7 @@ The web forms rely entirely on server-side validation, so users only see errors 
 
 ### 6.1 Summary
 
-The current system allows users to create multiple personas, each with its own set of attributes and a public/private toggle. Public personas are visible to anyone who visits the user's profile. Private personas are hidden and can only be accessed with a specific access token. This means the same user profile can show completely different information depending on who is looking at it and what tokens they have.
+The current system allows users to create multiple personas, each belonging to a context (e.g., Professional, Gaming, Legal) and carrying its own set of attributes and a public/private toggle. Public personas are visible to anyone who visits the user's profile, and visitors can filter by context to see only the dimension relevant to them. Private personas are hidden and can only be accessed with a specific access token. This means the same user profile can show completely different information depending on who is looking at it, which context they select, and what tokens they have.
 
 ### 6.2 What I Would Do Next
 
