@@ -301,14 +301,14 @@ This means a single user profile can look completely different depending on the 
 While the API is the primary product, I also built a web interface so that users can manage their personas without needing tools like Postman or curl. The interface is server-rendered using Jinja2 templates and includes:
 
 - **Login/Signup pages:** Session-based authentication using cookies. When a user signs up, their password is hashed and stored. On login, the password is verified and a session cookie is set
-- **Dashboard:** After logging in, users see all their personas (both public and private) with options to create, edit, or delete them. They can also toggle visibility and regenerate access tokens
+- **Dashboard:** After logging in, users see all their personas (both public and private) with options to create, edit, or delete them. They can toggle visibility from the edit page, and switching a persona to private automatically generates an access token
 - **Public Profile:** Each user has a shareable profile page at `/u/{username}` that shows only their public personas, with filter buttons to narrow by context. Clicking a persona card opens a dedicated detail page at `/u/{username}/{id}` showing its full attributes. This is what visitors see
 
 All templates extend a base template (`base.html`) that provides the consistent layout and navigation.
 
 ### 4.5 Admin Panel
 
-I integrated SQLAdmin to provide a quick way to browse and manage the database during development. It mounts at `/admin` and exposes views for both Users and Personas with search and sort functionality. This was useful for debugging and for verifying data integrity during development.
+I integrated SQLAdmin to provide a quick way to browse and manage the database during development. It mounts at `/admin` and exposes views for Users, Personas, and Contexts with search and sort functionality. This was useful for debugging and for verifying data integrity during development.
 
 ### 4.6 Flexible Data Model
 
