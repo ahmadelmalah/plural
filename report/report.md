@@ -320,7 +320,11 @@ One design decision I am happy with is the JSON `data` field on personas. Instea
 
 Each persona type has completely different fields, and the system handles them all the same way. The trade-off is that I cannot query or index individual JSON fields at the database level, but for this use case that is acceptable, the data is always accessed as a whole blob attached to a persona.
 
-### 4.7 Automated Test Suite Architecture
+### 4.7 Modular Route Architecture
+
+Initially, all API endpoints lived in `main.py` alongside the application setup, which grew to over 450 lines. The web routes (authentication, dashboard, profile) were already split into separate modules using FastAPI's `APIRouter`, so I applied the same pattern to the API routes. I created `app/routes/api_users.py` for user and context endpoints, `app/routes/api_personas.py` for persona endpoints, and `app/utils.py` for shared helper functions (serialization, response conversion). This reduced `main.py` to application setup and router registration only. A side benefit was centralising the database session dependency (`get_db`) into `app/database.py`, which all route modules now import from a single source, ensuring consistent behaviour across all endpoints and simplifying the test configuration.
+
+### 4.8 Automated Test Suite Architecture
 
 To ensure the API functions correctly, I implemented 60 automated tests using pytest. A key implementation detail is the use of `pytest` fixtures to manage test state efficiently. For example, a `sample_user` fixture creates a user object in the database before a test runs, and a `sample_user_with_personas` fixture sets up both public and private personas. This pattern kept the 60 individual test functions completely focused on asserting the API response logic, rather than repeating database setup boilerplate.
 
@@ -430,10 +434,6 @@ The API has no protection against brute-force attacks. An attacker could send th
 
 I deferred Cognito integration to focus on the persona logic, which was the right call for this project. But the current auth lacks features users would expect: no multi-factor authentication, no social login, and no password reset flow. The integration approach would be to replace the custom login routes with an OIDC flow against Cognito's hosted UI, adding a `cognito_sub` field to the User table to link external identities to local accounts. The persona logic would remain untouched since it depends only on `user_id`, not on how the user authenticated - this separation was a deliberate design choice.
 
-**Monolithic API File (Maintainability - Medium Priority)**
-
-All API endpoints currently live in `main.py` (~450 lines). The web routes are already split into separate modules using FastAPI's `APIRouter`, so the pattern is established. The fix is to create `app/routes/api_users.py` and `app/routes/api_personas.py`, move the relevant endpoints, and include them via `app.include_router()`. This would reduce `main.py` to application setup only.
-
 **No Frontend Validation (Usability - Low Priority)**
 
 The web forms rely entirely on server-side validation, so users only see errors after a full page reload. Adding HTML5 validation attributes (`required`, `type="email"`, `minlength`) to the Jinja2 templates would catch common errors instantly. This is low priority because the REST API is the primary product and its Pydantic validation is solid.
@@ -448,7 +448,7 @@ The current system allows users to create multiple personas, each belonging to a
 
 ### 6.2 What I Would Do Next
 
-The improvements I identified in section 5.4 fall into a natural priority order. First, the security fixes (bcrypt migration and rate limiting) because they are high-impact and low-effort, both can be done without changing the application's architecture. Second, the `main.py` refactor, because the pattern is already established with the web routes and it would make the codebase easier to extend. Third, the Cognito integration, which is the largest change but is deliberately decoupled from the persona logic.
+The improvements I identified in section 5.4 fall into a natural priority order. First, the security fixes (bcrypt migration and rate limiting) because they are high-impact and low-effort, both can be done without changing the application's architecture. Second, the Cognito integration, which is the largest change but is deliberately decoupled from the persona logic.
 
 Beyond those fixes, the feature I would most want to add is **external platform connectors**, allowing a persona to pull data from external APIs automatically. For example, a Gamer persona could sync with Steam to display current stats, or a Professional persona could pull repositories from GitHub. This would move Plural from a static data store to a live identity aggregation layer, which is closer to the original vision described in section 1.3.
 
