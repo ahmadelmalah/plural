@@ -267,7 +267,7 @@ After the prototyping phase with Flask and SQLite, I migrated the project to a s
 - **Database:** PostgreSQL 16 (running in Docker)
 - **ORM:** SQLAlchemy with Alembic for migrations
 - **Validation:** Pydantic for request/response schemas
-- **Authentication:** Session-based (cookies) for the web interface, access tokens for the API
+- **Authentication:** Session-based (cookies) with bcrypt password hashing for the web interface, access tokens for the API
 - **Templates:** Jinja2 for server-rendered HTML pages
 - **Admin:** SQLAdmin for database administration
 - **Containerisation:** Docker Compose to orchestrate the application and database services
@@ -300,7 +300,7 @@ This means a single user profile can look completely different depending on the 
 
 While the API is the primary product, I also built a web interface so that users can manage their personas without needing tools like Postman or curl. The interface is server-rendered using Jinja2 templates and includes:
 
-- **Login/Signup pages:** Session-based authentication using cookies. When a user signs up, their password is hashed and stored. On login, the password is verified and a session cookie is set
+- **Login/Signup pages:** Session-based authentication using cookies. When a user signs up, their password is hashed using bcrypt and stored. On login, the password is verified against the bcrypt hash and a session cookie is set
 - **Dashboard:** After logging in, users see all their personas (both public and private) with options to create, edit, or delete them. They can toggle visibility from the edit page, and switching a persona to private automatically generates an access token
 - **Public Profile:** Each user has a shareable profile page at `/u/{username}` that shows only their public personas, with filter buttons to narrow by context. Clicking a persona card opens a dedicated detail page at `/u/{username}/{id}` showing its full attributes. This is what visitors see
 
@@ -422,10 +422,6 @@ Finally, testing confirmed that users can manually regenerate access tokens from
 
 The project meets the success criteria I defined, but working through the implementation exposed several weaknesses. For each one, I describe the problem, why it matters, and how I would concretely fix it.
 
-**Password Hashing (Security - High Priority)**
-
-The current authentication uses SHA256 for password hashing. SHA256 is a general-purpose hash designed to be fast, which is the opposite of what password hashing needs, a fast hash means an attacker can try billions of guesses per second. The industry standard is bcrypt or argon2, which are deliberately slow and use salting. The fix is to replace the `hashlib.sha256` call in `auth.py` with `bcrypt.hashpw()` using `bcrypt.gensalt()`. The complication is existing users: their stored hashes cannot be reversed. The migration strategy would be to re-hash each password transparently on the next successful login, verify the old SHA256 hash, then immediately replace it with a bcrypt hash. This is a common pattern for upgrading legacy auth systems.
-
 **No Rate Limiting (Security - High Priority)**
 
 The API has no protection against brute-force attacks. An attacker could send thousands of login attempts per second or try to guess access tokens on the `GET /api/personas/{id}` endpoint. The fix would be to add rate limiting using a library like `slowapi` (which integrates with FastAPI) or at the reverse proxy level with nginx. The critical endpoints to protect are `/login`, `/api/personas/{id}`, and `/api/personas/{id}/regenerate-token`. A reasonable starting point would be 10 requests per minute on auth endpoints and 60 per minute on general API endpoints.
@@ -448,7 +444,7 @@ The current system allows users to create multiple personas, each belonging to a
 
 ### 6.2 What I Would Do Next
 
-The improvements I identified in section 5.4 fall into a natural priority order. First, the security fixes (bcrypt migration and rate limiting) because they are high-impact and low-effort, both can be done without changing the application's architecture. Second, the Cognito integration, which is the largest change but is deliberately decoupled from the persona logic.
+The improvements I identified in section 5.4 fall into a natural priority order. First, rate limiting, because it is high-impact and low-effort and can be done without changing the application's architecture. Second, the Cognito integration, which is the largest change but is deliberately decoupled from the persona logic.
 
 Beyond those fixes, the feature I would most want to add is **external platform connectors**, allowing a persona to pull data from external APIs automatically. For example, a Gamer persona could sync with Steam to display current stats, or a Professional persona could pull repositories from GitHub. This would move Plural from a static data store to a live identity aggregation layer, which is closer to the original vision described in section 1.3.
 

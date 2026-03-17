@@ -8,6 +8,7 @@ sqladmin
 jinja2
 python-multipart
 itsdangerous
+bcrypt
 
 # Testing
 pytest

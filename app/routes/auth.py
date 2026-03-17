@@ -1,5 +1,4 @@
-import hashlib
-
+import bcrypt
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -13,13 +12,13 @@ templates = Jinja2Templates(directory="app/templates")
 
 
 def hash_password(password: str) -> str:
-    """Simple password hashing using SHA256."""
-    return hashlib.sha256(password.encode()).hexdigest()
+    """Hash password using bcrypt."""
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
 
 def verify_password(password: str, hashed: str) -> bool:
-    """Verify password against hash."""
-    return hash_password(password) == hashed
+    """Verify password against bcrypt hash."""
+    return bcrypt.checkpw(password.encode(), hashed.encode())
 
 
 def get_current_user(request: Request, db: Session) -> User | None:
