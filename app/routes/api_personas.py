@@ -1,7 +1,9 @@
 import secrets
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -19,6 +21,7 @@ from app.utils import (
 )
 
 router = APIRouter()
+limiter = Limiter(key_func=get_remote_address)
 
 
 @router.post(
@@ -82,7 +85,9 @@ def list_user_personas(
 
 
 @router.get("/api/personas/{persona_id}", response_model=PersonaPublicResponse)
+@limiter.limit("60/minute")
 def get_persona(
+    request: Request,
     persona_id: int,
     x_access_token: Optional[str] = Header(None),
     db: Session = Depends(get_db)
@@ -189,7 +194,9 @@ def delete_persona(
 
 
 @router.post("/api/personas/{persona_id}/regenerate-token", response_model=PersonaOwnerResponse)
+@limiter.limit("10/minute")
 def regenerate_access_token(
+    request: Request,
     persona_id: int,
     x_access_token: str = Header(...),
     db: Session = Depends(get_db)

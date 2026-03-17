@@ -270,6 +270,7 @@ After the prototyping phase with Flask and SQLite, I migrated the project to a s
 - **Authentication:** Session-based (cookies) with bcrypt password hashing for the web interface, access tokens for the API
 - **Templates:** Jinja2 for server-rendered HTML pages
 - **Admin:** SQLAdmin for database administration
+- **Rate Limiting:** slowapi for per-IP request throttling
 - **Containerisation:** Docker Compose to orchestrate the application and database services
 
 ### 4.2 REST API
@@ -324,7 +325,11 @@ Each persona type has completely different fields, and the system handles them a
 
 Initially, all API endpoints lived in `main.py` alongside the application setup, which grew to over 450 lines. The web routes (authentication, dashboard, profile) were already split into separate modules using FastAPI's `APIRouter`, so I applied the same pattern to the API routes. I created `app/routes/api_users.py` for user and context endpoints, `app/routes/api_personas.py` for persona endpoints, and `app/utils.py` for shared helper functions (serialization, response conversion). This reduced `main.py` to application setup and router registration only. A side benefit was centralising the database session dependency (`get_db`) into `app/database.py`, which all route modules now import from a single source, ensuring consistent behaviour across all endpoints and simplifying the test configuration.
 
-### 4.8 Automated Test Suite Architecture
+### 4.8 Rate Limiting
+
+To protect against brute-force attacks, I integrated `slowapi` (a FastAPI-compatible rate limiting library built on top of `limits`). The limiter uses the client's IP address to track request counts. Authentication endpoints (`/login`, `/signup`) and the token regeneration endpoint are limited to 10 requests per minute, while the general API default is 60 requests per minute. When a client exceeds the limit, the API returns a `429 Too Many Requests` response. This prevents attackers from guessing access tokens or brute-forcing login credentials at scale.
+
+### 4.9 Automated Test Suite Architecture
 
 To ensure the API functions correctly, I implemented 60 automated tests using pytest. A key implementation detail is the use of `pytest` fixtures to manage test state efficiently. For example, a `sample_user` fixture creates a user object in the database before a test runs, and a `sample_user_with_personas` fixture sets up both public and private personas. This pattern kept the 60 individual test functions completely focused on asserting the API response logic, rather than repeating database setup boilerplate.
 
@@ -422,10 +427,6 @@ Finally, testing confirmed that users can manually regenerate access tokens from
 
 The project meets the success criteria I defined, but working through the implementation exposed several weaknesses. For each one, I describe the problem, why it matters, and how I would concretely fix it.
 
-**No Rate Limiting (Security - High Priority)**
-
-The API has no protection against brute-force attacks. An attacker could send thousands of login attempts per second or try to guess access tokens on the `GET /api/personas/{id}` endpoint. The fix would be to add rate limiting using a library like `slowapi` (which integrates with FastAPI) or at the reverse proxy level with nginx. The critical endpoints to protect are `/login`, `/api/personas/{id}`, and `/api/personas/{id}/regenerate-token`. A reasonable starting point would be 10 requests per minute on auth endpoints and 60 per minute on general API endpoints.
-
 **Authentication Layer (Architecture - Medium Priority)**
 
 I deferred Cognito integration to focus on the persona logic, which was the right call for this project. But the current auth lacks features users would expect: no multi-factor authentication, no social login, and no password reset flow. The integration approach would be to replace the custom login routes with an OIDC flow against Cognito's hosted UI, adding a `cognito_sub` field to the User table to link external identities to local accounts. The persona logic would remain untouched since it depends only on `user_id`, not on how the user authenticated - this separation was a deliberate design choice.
@@ -444,7 +445,7 @@ The current system allows users to create multiple personas, each belonging to a
 
 ### 6.2 What I Would Do Next
 
-The improvements I identified in section 5.4 fall into a natural priority order. First, rate limiting, because it is high-impact and low-effort and can be done without changing the application's architecture. Second, the Cognito integration, which is the largest change but is deliberately decoupled from the persona logic.
+The remaining improvements I identified in section 5.4 follow a natural priority order. First, the Cognito integration, which is the largest change but is deliberately decoupled from the persona logic.
 
 Beyond those fixes, the feature I would most want to add is **external platform connectors**, allowing a persona to pull data from external APIs automatically. For example, a Gamer persona could sync with Steam to display current stats, or a Professional persona could pull repositories from GitHub. This would move Plural from a static data store to a live identity aggregation layer, which is closer to the original vision described in section 1.3.
 

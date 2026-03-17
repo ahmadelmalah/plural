@@ -1,7 +1,10 @@
 from fastapi import Depends, FastAPI, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 from sqladmin import Admin
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
@@ -11,11 +14,16 @@ from app.database import engine, get_db
 from app.models import User
 from app.routes import api_personas, api_users, auth, dashboard, profile
 
+limiter = Limiter(key_func=get_remote_address, default_limits=["60/minute"])
+
 app = FastAPI(
     title="Plural - Identity Management API",
     description="A centralized API for managing multidimensional digital identities through Personas",
     version="0.1.0",
 )
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Session middleware for auth
 app.add_middleware(SessionMiddleware, secret_key="plural-secret-key-change-in-production")

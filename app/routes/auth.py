@@ -2,12 +2,15 @@ import bcrypt
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import User
 
 router = APIRouter()
+limiter = Limiter(key_func=get_remote_address)
 templates = Jinja2Templates(directory="app/templates")
 
 
@@ -38,6 +41,7 @@ async def login_page(request: Request):
 
 
 @router.post("/login")
+@limiter.limit("10/minute")
 async def login(
     request: Request,
     email: str = Form(...),
@@ -71,6 +75,7 @@ async def signup_page(request: Request):
 
 
 @router.post("/signup")
+@limiter.limit("10/minute")
 async def signup(
     request: Request,
     username: str = Form(...),
