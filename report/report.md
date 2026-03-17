@@ -430,9 +430,9 @@ The API has no protection against brute-force attacks. An attacker could send th
 
 I deferred Cognito integration to focus on the persona logic, which was the right call for this project. But the current auth lacks features users would expect: no multi-factor authentication, no social login, and no password reset flow. The integration approach would be to replace the custom login routes with an OIDC flow against Cognito's hosted UI, adding a `cognito_sub` field to the User table to link external identities to local accounts. The persona logic would remain untouched since it depends only on `user_id`, not on how the user authenticated - this separation was a deliberate design choice.
 
-**No Frontend Validation (Usability - Low Priority)**
+**Limited Frontend Validation (Usability - Low Priority)**
 
-The web forms rely entirely on server-side validation, so users only see errors after a full page reload. Adding HTML5 validation attributes (`required`, `type="email"`, `minlength`) to the Jinja2 templates would catch common errors instantly. This is low priority because the REST API is the primary product and its Pydantic validation is solid.
+The web forms use HTML5 validation attributes (`required`, `type="email"`, `minlength`, `maxlength`) to catch common errors before submission, but more advanced checks (such as duplicate email or username detection) still rely on server-side validation and require a full page reload. Adding asynchronous validation (e.g., checking username availability as the user types) would improve the experience, but this is low priority because the REST API is the primary product and its Pydantic validation is solid.
 
 ---
 
