@@ -44,7 +44,7 @@ The system responds dynamically based on the context. If a recruiter queries the
 
 It's important to define a clear scope to avoid any scope creep
 
-**What this project IS:** The application focuses on the Representation Layer (how the user wants to present themselves in different contexts). The system uses a built-in session-based authentication to support the core persona management functionality. Delegating authentication to an external provider like AWS Cognito remains a candidate for future development to enhance integration with other systems and improve security.
+**What this project IS:** The application focuses on the Representation Layer (how the user wants to present themselves in different contexts). The system supports two authentication methods: a built-in session-based authentication (email/password) and a delegated authentication flow via AWS Cognito using OpenID Connect (OIDC). The Cognito integration allows users to sign up and log in through AWS's hosted UI, while the persona management logic remains completely independent of how the user authenticated.
 
 **What this project is NOT:** To clarify the specific contribution of this work, it is important to distinguish it from existing terms:
 
@@ -168,17 +168,17 @@ The project operates within the domain of Privacy Engineering and Identity Manag
 
 The system follows a three-tier architecture. At the top layer, two types of clients interact with the application: human users through a browser (the web interface) and external systems through HTTP requests (the REST API). Both hit the same FastAPI application server, which handles routing, authentication, input validation (via Pydantic), and the privacy enforcement logic. The application server communicates with a PostgreSQL database through SQLAlchemy ORM.
 
-**[Figure 1: System Architecture Diagram — to be added]**
+**[Figure 1: System Architecture Diagram]**
 
 ### 3.4 Design and Architectural Choices
 
 The following sections describe the key technical decisions I made and the reasoning behind each one.
 
-#### 3.4.1 Authentication Strategy (Delegated Auth)
+#### 3.4.1 Authentication Strategy (Dual Auth)
 
-**Decision:** Session-based authentication, with the architecture designed for future migration to a delegated provider (e.g. AWS Cognito, Auth0)
+**Decision:** Dual authentication: built-in session-based (email/password) plus delegated AWS Cognito via OIDC
 
-**Justification:** Building a fully-featured authentication system from scratch (handling MFA, social login, and password reset flows) is error-prone and distracts from the core innovation of "Persona Management." I initially considered delegating authentication entirely to AWS Cognito (OIDC), but that was pulling my attention away from the core problem I wanted to solve. Instead, I implemented a simpler session-based authentication using password hashing and cookies, which gave me a working auth layer without the integration overhead. The design is kept abstract enough to allow swapping the auth provider (Cognito, Auth0, or Google Identity) without rewriting the persona logic.
+**Justification:** Building a fully-featured authentication system from scratch (handling MFA, social login, and password reset flows) is error-prone and distracts from the core innovation of "Persona Management." I initially implemented a simpler session-based authentication using password hashing and cookies, which gave me a working auth layer without the integration overhead. Later, I added AWS Cognito as a second authentication method using the OpenID Connect (OIDC) Authorization Code flow. This gives users the choice: they can register with email/password directly, or sign up through Cognito's hosted UI. Both methods end in the same session-based login, and the persona logic depends only on `user_id`, not on how the user authenticated. This separation was a deliberate design choice that made the Cognito integration straightforward to add without touching the core persona code.
 
 #### 3.4.2 API-First Design (REST)
 
@@ -221,7 +221,8 @@ I decided to start with three main tables representing the core entities:
 | id | Table Primary Key |
 | email | The user's email address (unique) |
 | username | A public username for the user (unique) |
-| password_hash | Hashed password for session-based authentication |
+| password_hash | Hashed password for session-based authentication (nullable; Cognito users have no local password) |
+| cognito_sub | The unique subject identifier from AWS Cognito (nullable, unique). Present only for users who authenticated via Cognito OIDC |
 | created_at | The registration date of the user |
 | updated_at | Last time the user has updated their information |
 
@@ -253,7 +254,7 @@ I decided to start with three main tables representing the core entities:
 | created_at | When was the persona created |
 | updated_at | When was the last time the persona was updated |
 
-**[Figure 2: Entity Relationship Diagram — to be added]**
+**[Figure 2: Entity Relationship Diagram]**
 
 ---
 
@@ -267,7 +268,8 @@ After the prototyping phase with Flask and SQLite, I migrated the project to a s
 - **Database:** PostgreSQL 16 (running in Docker)
 - **ORM:** SQLAlchemy with Alembic for migrations
 - **Validation:** Pydantic for request/response schemas
-- **Authentication:** Session-based (cookies) with bcrypt password hashing for the web interface, access tokens for the API
+- **Authentication:** Dual: session-based (cookies) with bcrypt password hashing, plus AWS Cognito OIDC (OpenID Connect Authorization Code flow) as a delegated alternative. Access tokens for private persona API access
+- **OIDC Library:** Authlib for JWT decoding and JWKS verification
 - **Templates:** Jinja2 for server-rendered HTML pages
 - **Admin:** SQLAdmin for database administration
 - **Rate Limiting:** slowapi for per-IP request throttling
@@ -301,17 +303,40 @@ This means a single user profile can look completely different depending on the 
 
 While the API is the primary product, I also built a web interface so that users can manage their personas without needing tools like Postman or curl. The interface is server-rendered using Jinja2 templates and includes:
 
-- **Login/Signup pages:** Session-based authentication using cookies. When a user signs up, their password is hashed using bcrypt and stored. On login, the password is verified against the bcrypt hash and a session cookie is set
+- **Login/Signup pages:** Session-based authentication using cookies. When a user signs up, their password is hashed using bcrypt and stored. On login, the password is verified against the bcrypt hash and a session cookie is set. Both pages also include a "Continue with AWS Cognito" button (with a visual divider) that redirects to Cognito's hosted UI. The login page redirects to Cognito's login screen, while the signup page redirects directly to Cognito's registration screen
 - **Dashboard:** After logging in, users see all their personas (both public and private) with options to create, edit, or delete them. They can toggle visibility from the edit page, and switching a persona to private automatically generates an access token
 - **Public Profile:** Each user has a shareable profile page at `/u/{username}` that shows only their public personas, with filter buttons to narrow by context. Clicking a persona card opens a dedicated detail page at `/u/{username}/{id}` showing its full attributes. This is what visitors see
 
 All templates extend a base template (`base.html`) that provides the consistent layout and navigation.
 
-### 4.5 Admin Panel
+### 4.5 AWS Cognito OIDC Integration
+
+After the core persona logic was stable, I added AWS Cognito as a second authentication method using the OpenID Connect (OIDC) Authorization Code flow. This was the largest single feature addition to the project, touching 10 files across the backend, frontend, database, tests, and deployment configuration.
+
+**Why Cognito:** The original session-based auth works but lacks features users expect from a production system: social login, multi-factor authentication, and password reset flows. Rather than building all of these from scratch, I delegated them to AWS Cognito, which provides a hosted UI and handles the security-critical parts of user registration and authentication. The application only needs to verify the tokens Cognito returns.
+
+**How It Works:** The integration follows the standard OIDC Authorization Code flow:
+
+1. The user clicks "Continue with AWS Cognito" on the login or signup page
+2. The application redirects to Cognito's hosted UI (`/oauth2/authorize` for login, `/signup` for registration), passing a CSRF state parameter stored in the session
+3. After the user authenticates on Cognito's hosted UI, Cognito redirects back to `/auth/cognito/callback` with an authorization code
+4. The application exchanges the code for tokens at Cognito's `/oauth2/token` endpoint using Basic auth (client ID + secret)
+5. The ID token (a JWT) is decoded and verified against Cognito's public JWKS (JSON Web Key Set) endpoint to extract the user's `sub` (unique identifier) and `email`
+6. The application then resolves the user: if a user with that `cognito_sub` exists, they are logged in directly; if a user with that email exists (a local account), the `cognito_sub` is linked to their account; if no user exists, they are redirected to a username picker page (`/auth/cognito/complete`) since Plural requires a username for profile URLs
+
+**Account Linking:** A key design decision was to support linking existing local accounts. If a user originally registered with email/password and later signs in via Cognito using the same email, the system links the Cognito identity to their existing account rather than creating a duplicate. This means the user keeps all their existing personas and profile data.
+
+**Logout:** The logout flow was extended to redirect to Cognito's `/logout` endpoint (passing the `client_id` and `logout_uri`), which ensures the user is signed out of both the application session and the Cognito session. If Cognito is not configured, logout falls back to simply clearing the local session.
+
+**Configuration:** All Cognito settings (region, pool ID, client ID, client secret, domain) are loaded from environment variables via a `.env` file. The Docker Compose configuration was updated to pass these variables to the container. If the Cognito environment variables are empty, the Cognito buttons and routes gracefully fall back to the local auth flow, so the application works with or without Cognito configured.
+
+**Database Migration:** A new `cognito_sub` column was added to the Users table via an Alembic migration. The column is nullable (local users do not have one) and unique (each Cognito identity maps to exactly one user). The `password_hash` column was also made nullable to support Cognito-only users who have no local password.
+
+### 4.6 Admin Panel
 
 I integrated SQLAdmin to provide a quick way to browse and manage the database during development. It mounts at `/admin` and exposes views for Users, Personas, and Contexts with search and sort functionality. This was useful for debugging and for verifying data integrity during development.
 
-### 4.6 Flexible Data Model
+### 4.7 Flexible Data Model
 
 One design decision I am happy with is the JSON `data` field on personas. Instead of defining fixed columns for every possible attribute (which would be impossible given the variety of persona types), I store the persona's attributes as a JSON string in a Text column. This means:
 
@@ -321,17 +346,17 @@ One design decision I am happy with is the JSON `data` field on personas. Instea
 
 Each persona type has completely different fields, and the system handles them all the same way. The trade-off is that I cannot query or index individual JSON fields at the database level, but for this use case that is acceptable, the data is always accessed as a whole blob attached to a persona.
 
-### 4.7 Modular Route Architecture
+### 4.8 Modular Route Architecture
 
 Initially, all API endpoints lived in `main.py` alongside the application setup, which grew to over 450 lines. The web routes (authentication, dashboard, profile) were already split into separate modules using FastAPI's `APIRouter`, so I applied the same pattern to the API routes. I created `app/routes/api_users.py` for user and context endpoints, `app/routes/api_personas.py` for persona endpoints, and `app/utils.py` for shared helper functions (serialization, response conversion). This reduced `main.py` to application setup and router registration only. A side benefit was centralising the database session dependency (`get_db`) into `app/database.py`, which all route modules now import from a single source, ensuring consistent behaviour across all endpoints and simplifying the test configuration.
 
-### 4.8 Rate Limiting
+### 4.9 Rate Limiting
 
 To protect against brute-force attacks, I integrated `slowapi` (a FastAPI-compatible rate limiting library built on top of `limits`). The limiter uses the client's IP address to track request counts. Authentication endpoints (`/login`, `/signup`) and the token regeneration endpoint are limited to 10 requests per minute, while the general API default is 60 requests per minute. When a client exceeds the limit, the API returns a `429 Too Many Requests` response. This prevents attackers from guessing access tokens or brute-forcing login credentials at scale.
 
-### 4.9 Automated Test Suite Architecture
+### 4.10 Automated Test Suite Architecture
 
-To ensure the API functions correctly, I implemented 60 automated tests using pytest. A key implementation detail is the use of `pytest` fixtures to manage test state efficiently. For example, a `sample_user` fixture creates a user object in the database before a test runs, and a `sample_user_with_personas` fixture sets up both public and private personas. This pattern kept the 60 individual test functions completely focused on asserting the API response logic, rather than repeating database setup boilerplate.
+To ensure the API and authentication flows function correctly, I implemented 76 automated tests using pytest. A key implementation detail is the use of `pytest` fixtures to manage test state efficiently. For example, a `sample_user` fixture creates a user object in the database before a test runs, and a `sample_user_with_personas` fixture sets up both public and private personas. This pattern kept the individual test functions completely focused on asserting logic, rather than repeating database setup boilerplate. Of the 76 tests, 60 cover the REST API and persona logic, and 16 cover the Cognito OIDC authentication flow (login redirect, callback handling, account linking, username completion, and logout).
 
 ---
 
@@ -369,7 +394,7 @@ In addition to unit-level criteria, the test suite includes two scenario tests t
 
 #### 5.2.1 What the Tests Cover
 
-The 60 tests are organised into the following groups, as shown in Table 4.
+The 76 tests are organised into the following groups, as shown in Table 4.
 
 **Table 4:** Automated Test Suite Coverage
 
@@ -391,6 +416,10 @@ The 60 tests are organised into the following groups, as shown in Table 4.
 | Cascade Delete | 1 | Deleting user removes all their personas |
 | Privacy Boundaries | 2 | Recruiter scenario (only sees public), contextual identity (same user, different responses) |
 | Data Integrity | 3 | Maps directly to the success criteria from section 5.1 |
+| Cognito Login | 2 | Redirect to Cognito authorize URL, graceful fallback when Cognito is not configured |
+| Cognito Callback | 5 | Missing code/state, invalid state, new user redirect to complete, existing Cognito user login, email-based account linking, token exchange failure |
+| Cognito Complete | 5 | Redirect without session, form display with session, user creation, duplicate username rejection, POST without session |
+| Cognito Logout | 2 | Redirect to Cognito logout endpoint, fallback to local logout without Cognito |
 
 ### 5.2.2 Results Against Success Criteria
 
@@ -423,13 +452,17 @@ To definitively prove that the system solves the "Context Collapse" problem iden
 **Step 4: Token Management**
 Finally, testing confirmed that users can manually regenerate access tokens from the dashboard, which successfully invalidates the old token for API access.
 
-### 5.4 Limitations and Future Improvements
+### 5.4 Strengths
+
+**Separation of Authentication and Persona Logic:** The architecture keeps authentication and persona management fully decoupled. The persona layer depends only on `user_id`, not on how the user authenticated. This was validated when I added AWS Cognito OIDC as a second authentication method (see section 4.5): the integration touched 10 files but required no changes to any existing persona code. The fact that a major feature could be added purely through additive changes confirms that the original separation was sound.
+
+**Privacy Enforcement at the API Level:** The access token mechanism for private personas means that privacy is enforced in the API layer itself, not just in the UI. Even if a client bypasses the web interface entirely, private personas remain hidden unless the correct token is provided. This is a stronger guarantee than UI-only visibility controls.
+
+**Comprehensive Test Coverage:** The test suite covers 76 cases across authentication, persona CRUD, privacy enforcement, API access tokens, and the Cognito OIDC flow. Tests run against an in-memory SQLite database, keeping them fast and isolated. The Cognito tests use mocked HTTP responses, so they verify the application logic without depending on external services.
+
+### 5.5 Limitations and Future Improvements
 
 The project meets the success criteria I defined, but working through the implementation exposed several weaknesses. For each one, I describe the problem, why it matters, and how I would concretely fix it.
-
-**Authentication Layer (Architecture - Medium Priority)**
-
-I deferred Cognito integration to focus on the persona logic, which was the right call for this project. But the current auth lacks features users would expect: no multi-factor authentication, no social login, and no password reset flow. The integration approach would be to replace the custom login routes with an OIDC flow against Cognito's hosted UI, adding a `cognito_sub` field to the User table to link external identities to local accounts. The persona logic would remain untouched since it depends only on `user_id`, not on how the user authenticated - this separation was a deliberate design choice.
 
 **Limited Frontend Validation (Usability - Low Priority)**
 
@@ -441,17 +474,15 @@ The web forms use HTML5 validation attributes (`required`, `type="email"`, `minl
 
 ### 6.1 Summary
 
-The current system allows users to create multiple personas, each belonging to a context (e.g., Professional, Gaming, Legal) and carrying its own set of attributes and a public/private toggle. Public personas are visible to anyone who visits the user's profile, and visitors can filter by context to see only the dimension relevant to them. Private personas are hidden and can only be accessed with a specific access token. This means the same user profile can show completely different information depending on who is looking at it, which context they select, and what tokens they have.
+The current system allows users to create multiple personas, each belonging to a context (e.g., Professional, Gaming, Legal) and carrying its own set of attributes and a public/private toggle. Public personas are visible to anyone who visits the user's profile, and visitors can filter by context to see only the dimension relevant to them. Private personas are hidden and can only be accessed with a specific access token. This means the same user profile can show completely different information depending on who is looking at it, which context they select, and what tokens they have. The system supports dual authentication, allowing users to register and log in either with email/password or through AWS Cognito's hosted UI via OIDC, and both methods feed into the same persona management layer.
 
 ### 6.2 What I Would Do Next
 
-The remaining improvements I identified in section 5.4 follow a natural priority order. First, the Cognito integration, which is the largest change but is deliberately decoupled from the persona logic.
-
-Beyond those fixes, the feature I would most want to add is **external platform connectors**, allowing a persona to pull data from external APIs automatically. For example, a Gamer persona could sync with Steam to display current stats, or a Professional persona could pull repositories from GitHub. This would move Plural from a static data store to a live identity aggregation layer, which is closer to the original vision described in section 1.3.
+The Cognito OIDC integration, originally identified as the highest-priority improvement, has now been implemented (see section 4.5). With authentication addressed, the feature I would most want to add next is **external platform connectors**, allowing a persona to pull data from external APIs automatically. For example, a Gamer persona could sync with Steam to display current stats, or a Professional persona could pull repositories from GitHub. This would move Plural from a static data store to a live identity aggregation layer, which is closer to the original vision described in section 1.3.
 
 ### 6.3 Reflection
 
-Looking back, the biggest lesson was learning when to defer a feature. I originally planned to integrate Cognito from the start, but that was pulling my attention away from the core problem. Switching to a simple built-in auth let me focus on getting the persona logic right, the privacy enforcement, the access tokens, the contextual responses. That is the part that makes this project different from a standard CRUD API, and it needed the most attention. The Flask-to-FastAPI migration was also worth the effort; the Pydantic validation and automatic Swagger docs saved me time and caught bugs that I would have missed with manual dictionary handling.
+Looking back, the biggest lesson was learning when to defer a feature and when to come back to it. I originally planned to integrate Cognito from the start, but that was pulling my attention away from the core problem. Switching to a simple built-in auth let me focus on getting the persona logic right: the privacy enforcement, the access tokens, the contextual responses. That is the part that makes this project different from a standard CRUD API, and it needed the most attention. Once the persona logic was stable and fully tested, adding Cognito was straightforward precisely because the architecture kept authentication and persona management separate. The `cognito_sub` column, the OIDC callback routes, and the account linking logic were all additive changes that did not require modifying a single line of the existing persona code, validating the original design decision. The Flask-to-FastAPI migration was also worth the effort; the Pydantic validation and automatic Swagger docs saved me time and caught bugs that I would have missed with manual dictionary handling.
 
 ---
 
