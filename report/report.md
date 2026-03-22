@@ -452,6 +452,15 @@ To definitively prove that the system solves the "Context Collapse" problem iden
 **Step 4: Token Management**
 Finally, testing confirmed that users can manually regenerate access tokens from the dashboard, which successfully invalidates the old token for API access.
 
+**Step 5: AWS Cognito Authentication Flow**
+The Cognito login and signup flows were tested with a configured AWS Cognito User Pool. Clicking "Continue with AWS Cognito" on the login page redirects to Cognito's hosted login screen, while clicking it on the signup page redirects directly to Cognito's registration screen. After authenticating on Cognito's hosted UI, the callback correctly resolves the user: returning users are logged in immediately, while new users are redirected to the username completion page (`/auth/cognito/complete`). Account linking was also verified by signing in via Cognito with an email that already had a local account; the system linked the Cognito identity to the existing account and preserved all existing personas. Logout was confirmed to clear both the local session and the Cognito session.
+
+**Step 6: Rate Limiting**
+Rate limiting was verified by sending repeated requests to the login endpoint. After exceeding the configured threshold (10 requests per minute), the server returned `429 Too Many Requests` as expected. This confirms that the slowapi integration is active and correctly throttling per-IP request rates on authentication endpoints.
+
+**Step 7: Docker Deployment**
+The full application was deployed using `docker-compose up` to verify that the containerised environment works end-to-end. The PostgreSQL database initialised correctly, Alembic migrations ran on startup, and the FastAPI application served both the API and web interface. Environment variables for Cognito were passed through the Docker Compose configuration and picked up by the application without issues.
+
 ### 5.4 Strengths
 
 **Separation of Authentication and Persona Logic:** The architecture keeps authentication and persona management fully decoupled. The persona layer depends only on `user_id`, not on how the user authenticated. This was validated when I added AWS Cognito OIDC as a second authentication method (see section 4.5): the integration touched 10 files but required no changes to any existing persona code. The fact that a major feature could be added purely through additive changes confirms that the original separation was sound.
@@ -490,7 +499,11 @@ The highest-priority improvement is **external platform connectors**, as discuss
 
 ### 6.3 Reflection
 
-Looking back, the biggest lesson was learning when to defer a feature and when to come back to it. I originally planned to integrate Cognito from the start, but that was pulling my attention away from the core problem. Switching to a simple built-in auth let me focus on getting the persona logic right: the privacy enforcement, the access tokens, the contextual responses. That is the part that makes this project different from a standard CRUD API, and it needed the most attention. Once the persona logic was stable and fully tested, adding Cognito was straightforward precisely because the architecture kept authentication and persona management separate. The `cognito_sub` column, the OIDC callback routes, and the account linking logic were all additive changes that did not require modifying a single line of the existing persona code, validating the original design decision. The Flask-to-FastAPI migration was also worth the effort; the Pydantic validation and automatic Swagger docs saved me time and caught bugs that I would have missed with manual dictionary handling.
+Looking back, the biggest lesson was learning when to defer a feature and when to come back to it. I originally planned to integrate Cognito from the start, but that was pulling my attention away from the core problem. Switching to a simple built-in auth let me focus on getting the persona logic right: the privacy enforcement, the access tokens, the contextual responses. That is the part that makes this project different from a standard CRUD API, and it needed the most attention. Once the persona logic was stable and fully tested, adding Cognito was straightforward precisely because the architecture kept authentication and persona management separate. The `cognito_sub` column, the OIDC callback routes, and the account linking logic were all additive changes that did not require modifying a single line of the existing persona code, validating the original design decision.
+
+The API-first approach also proved its value. By designing the privacy enforcement at the API level rather than the UI level, the system guarantees that private personas are hidden regardless of how the data is accessed. This meant the web interface did not need its own privacy logic; it simply renders whatever the API returns. If I had built the web interface first, I might have implemented privacy as a UI concern and then had to duplicate or retrofit it for the API.
+
+The Flask-to-FastAPI migration was also worth the effort. The Pydantic validation and automatic Swagger docs saved me time and caught bugs that I would have missed with manual dictionary handling. More importantly, defining separate response models (`PersonaPublicResponse` and `PersonaOwnerResponse`) gave me a framework-level guarantee that access tokens would never leak into public responses, even if I made a mistake in the endpoint logic.
 
 ---
 
