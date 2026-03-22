@@ -497,21 +497,37 @@ The web forms use HTML5 validation attributes (`required`, `type="email"`, `minl
 
 ## 6. Conclusion
 
-### 6.1 Summary
+### 6.1 Summary of Achievements
 
-The current system allows users to create multiple personas, each belonging to a context (e.g., Professional, Gaming, Legal) and carrying its own set of attributes and a public/private toggle. Public personas are visible to anyone who visits the user's profile, and visitors can filter by context to see only the dimension relevant to them. Private personas are hidden and can only be accessed with a specific access token. This means the same user profile can show completely different information depending on who is looking at it, which context they select, and what tokens they have. The system supports dual authentication, allowing users to register and log in either with email/password or through AWS Cognito's hosted UI via OIDC, and both methods feed into the same persona management layer.
+The goal of this project was to take the idea of "context collapse" from the academic literature and show that it can be addressed at the software level. Plural does this by giving users a way to split their digital identity into separate personas, each tied to a context, and control which ones are visible to which audience.
 
-### 6.2 What I Would Do Next
+The system sits on top of standard authentication and adds a representation layer. Users group their information into context-bound Personas and set each one as public or private. The API enforces these boundaries with access tokens, so a requesting platform only sees the persona it is supposed to see. Adding dual authentication (session-based and AWS Cognito OIDC) showed that keeping authentication separate from persona logic was the right call, since the entire Cognito integration required no changes to any existing persona code. The automated tests and scenario evaluations confirmed that the system enforces Nissenbaum's contextual integrity [10] in practice: the right information reaches the right context, and private data stays hidden.
 
-The highest-priority improvement is **external platform connectors**, as discussed in section 5.5. Currently all persona data is entered manually, which creates friction and means the data can become outdated. Adding connectors that pull data from external APIs (e.g., Steam for gaming stats, GitHub for repositories) would move Plural from a static data store to a live identity aggregation layer, which is closer to the original vision described in section 1.3.
+### 6.2 Future Work and Extensions
 
-### 6.3 Reflection
+The current implementation proves the core concept, but moving it toward a production-ready service would need a few key extensions:
 
-Looking back, the biggest lesson was learning when to defer a feature and when to come back to it. I originally planned to integrate Cognito from the start, but that was pulling my attention away from the core problem. Switching to a simple built-in auth let me focus on getting the persona logic right: the privacy enforcement, the access tokens, the contextual responses. That is the part that makes this project different from a standard CRUD API, and it needed the most attention. Once the persona logic was stable and fully tested, adding Cognito was straightforward precisely because the architecture kept authentication and persona management separate. The `cognito_sub` column, the OIDC callback routes, and the account linking logic were all additive changes that did not require modifying a single line of the existing persona code, validating the original design decision.
+**External Platform Connectors:** Right now, all persona data is typed in manually by the user. The biggest improvement would be a connector layer that pulls data from external APIs (e.g., Steam, GitHub, LinkedIn) via OAuth and writes it into the persona's JSON data field automatically. This would turn Plural from a static data store into something closer to a live identity hub.
 
-The API-first approach also proved its value. By designing the privacy enforcement at the API level rather than the UI level, the system guarantees that private personas are hidden regardless of how the data is accessed. This meant the web interface did not need its own privacy logic; it simply renders whatever the API returns. If I had built the web interface first, I might have implemented privacy as a UI concern and then had to duplicate or retrofit it for the API.
+**Infrastructure-Level Security:** The application uses slowapi for rate limiting, which works but runs inside the application itself. In a production setup, this should sit at the edge instead. An API Gateway (like AWS API Gateway) and a Web Application Firewall (WAF) would block DDoS attacks and token brute-forcing before traffic reaches the FastAPI server.
 
-The Flask-to-FastAPI migration was also worth the effort. The Pydantic validation and automatic Swagger docs saved me time and caught bugs that I would have missed with manual dictionary handling. More importantly, defining separate response models (`PersonaPublicResponse` and `PersonaOwnerResponse`) gave me a framework-level guarantee that access tokens would never leak into public responses, even if I made a mistake in the endpoint logic.
+**OAuth 2.0 Authorization Server:** Currently, private personas are unlocked with custom access tokens. A natural next step would be making Plural an OAuth 2.0 Authorization Server, so third-party apps can request specific scopes (e.g., `read:persona_gaming`). This would give users a standard, consent-based way to share parts of their identity with external platforms.
+
+### 6.3 Technical Reflection
+
+Looking back, the most useful lesson was learning when to defer a feature and when to come back to it.
+
+I originally planned to add Cognito from the start, but that was pulling my attention away from the core problem. Falling back to simple session-based auth let me focus on getting the persona logic right: the privacy enforcement, the access tokens, the contextual responses. Once that was solid and fully tested, adding Cognito was straightforward because the architecture kept the two concerns separate. The OIDC routes and the `cognito_sub` column were purely additive changes that did not touch a single line of persona code.
+
+The API-first approach also paid off. Because privacy is enforced in the API layer, private personas stay hidden no matter how the data is accessed. The web interface does not need its own privacy logic; it just renders whatever the API returns. If I had built the UI first, I probably would have implemented privacy as a frontend concern and then had to redo it for the API.
+
+Migrating from Flask to FastAPI was also worth the effort. Pydantic's response models (`PersonaPublicResponse` vs. `PersonaOwnerResponse`) gave me a framework-level guarantee that access tokens would never appear in public responses, even if I made a mistake in the endpoint logic. That kind of safety net did not exist in the Flask prototype.
+
+### 6.4 Broader Themes
+
+At a wider level, this project points to a gap in how most platforms handle user profiles. The standard approach treats identity as a single thing: one row in a database, one profile page, one set of attributes shown to everyone. That made sense when people used one or two platforms, but it does not match how people actually live online today.
+
+As digital footprints grow, this one-size-fits-all model leads to context collapse and privacy fatigue. Plural shows that identity does not have to be a binary choice between full exposure and anonymity. By building systems that support "partial identities" and enforce contextual boundaries by default, developers can create tools that match how people naturally behave: showing different sides of themselves to different audiences. The future of digital identity is not about building higher walls around a single profile, but about giving users the tools to manage their own complexity.
 
 ---
 
