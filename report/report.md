@@ -44,7 +44,7 @@ The system responds dynamically based on the context. If a recruiter queries the
 
 It's important to define a clear scope to avoid any scope creep
 
-**What this project IS:** The application focuses on the Representation Layer (how the user wants to present themselves in different contexts). The system supports two authentication methods: a built-in session-based authentication (email/password) and a delegated authentication flow via AWS Cognito using OpenID Connect (OIDC). The Cognito integration allows users to sign up and log in through AWS's hosted UI, while the persona management logic remains completely independent of how the user authenticated.
+**What this project IS:** The application is a Representation Layer: it manages how a user wants to present themselves in different contexts. Users create multiple personas, each belonging to a context (e.g. Professional, Gaming, Legal) and carrying its own set of attributes and a public/private visibility toggle. The system exposes these personas through a REST API and a web interface, enforcing privacy boundaries so that the same user profile can return completely different data depending on who is asking and what access they have. The core contribution is contextual identity projection, not authentication or access control.
 
 **What this project is NOT:** To clarify the specific contribution of this work, it is important to distinguish it from existing terms:
 
@@ -52,7 +52,7 @@ It's important to define a clear scope to avoid any scope creep
 
 - **This is not a Single Sign-On (SSO) Solution:** The goal is not to provide a mechanism where users sign in once to access multiple platforms without sharing credentials.
 
-The design philosophy is integration, not competition: the application delegates authentication to dedicated identity providers (currently AWS Cognito) and focuses on managing and projecting the user's personas.
+In practice, the system supports two authentication methods: a built-in session-based flow (email/password) and a delegated flow via AWS Cognito using OpenID Connect (OIDC). The persona management logic remains completely independent of how the user authenticated. The design philosophy is integration, not competition: the application delegates authentication to dedicated identity providers and focuses on managing and projecting the user's personas.
 
 ### 1.6 Motivation
 
