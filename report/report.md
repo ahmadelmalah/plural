@@ -303,6 +303,8 @@ This means a single user profile can look completely different depending on the 
 
 While the API is the primary product, I also built a web interface so that users can manage their personas without needing tools like Postman or curl. The interface is server-rendered using Jinja2 templates and includes:
 
+- **Landing Page:** The root URL (`/`) serves a public landing page that introduces the project's concept with a tagline, three feature cards (Multiple Personas, Privacy Control, One Link), and calls to action for signing up or viewing a demo profile
+
 - **Login/Signup pages:** Session-based authentication using cookies. When a user signs up, their password is hashed using bcrypt and stored. On login, the password is verified against the bcrypt hash and a session cookie is set. Both pages also include a "Continue with AWS Cognito" button (with a visual divider) that redirects to Cognito's hosted UI. The login page redirects to Cognito's login screen, while the signup page redirects directly to Cognito's registration screen
 - **Dashboard:** After logging in, users see all their personas (both public and private) with options to create, edit, or delete them. They can toggle visibility from the edit page, and switching a persona to private automatically generates an access token
 - **Public Profile:** Each user has a shareable profile page at `/u/{username}` that shows only their public personas, with filter buttons to narrow by context. Clicking a persona card opens a dedicated detail page at `/u/{username}/{id}` showing its full attributes. This is what visitors see
@@ -357,6 +359,10 @@ To protect against brute-force attacks, I integrated `slowapi` (a FastAPI-compat
 ### 4.10 Automated Test Suite Architecture
 
 To ensure the API and authentication flows function correctly, I implemented 76 automated tests using pytest. A key implementation detail is the use of `pytest` fixtures to manage test state efficiently. For example, a `sample_user` fixture creates a user object in the database before a test runs, and a `sample_user_with_personas` fixture sets up both public and private personas. This pattern kept the individual test functions completely focused on asserting logic, rather than repeating database setup boilerplate. Of the 76 tests, 60 cover the REST API and persona logic, and 16 cover the Cognito OIDC authentication flow (login redirect, callback handling, account linking, username completion, and logout).
+
+### 4.11 Seed Script
+
+To make the application immediately usable after deployment, I created a seed script (`seed.py`) that populates the database with foundational data. The script first creates the core set of contexts (Professional, Gaming, Creative, Social, Legal, Academic, Fitness), which are the categories users select when creating a persona. It then seeds five sample users, each with two to three personas spanning different contexts and visibility settings, giving a total of 15 personas. The sample data is deliberately realistic: one user is a backend developer who also games, another is a writer and photographer who keeps her day job private. This makes the seed data useful both for development and for demonstrating the project's core concept to evaluators. The landing page links to one of these seeded profiles so that visitors can immediately explore a working example.
 
 ---
 
