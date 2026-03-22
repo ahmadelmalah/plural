@@ -52,7 +52,7 @@ It's important to define a clear scope to avoid any scope creep
 
 - **This is not a Single Sign-On (SSO) Solution:** The goal is not to provide a mechanism where users sign in once to access multiple platforms without sharing credentials.
 
-While the application could integrate with external systems like IAM and SSO services, it is designed from the ground up to serve a single purpose: managing and projecting the different representations and dimensions (personas) of the user.
+The design philosophy is integration, not competition: the application delegates authentication to dedicated identity providers (currently AWS Cognito) and focuses on managing and projecting the user's personas.
 
 ### 1.6 Motivation
 
@@ -464,6 +464,14 @@ Finally, testing confirmed that users can manually regenerate access tokens from
 
 The project meets the success criteria I defined, but working through the implementation exposed several weaknesses. For each one, I describe the problem, why it matters, and how I would concretely fix it.
 
+**No External Platform Connectors (Functionality - Medium Priority)**
+
+All persona data is currently entered manually by the user. The system does not connect to external platforms to pull data automatically. This means a Gamer persona cannot sync stats from Steam, and a Professional persona cannot import repositories from GitHub. The user must type in every attribute by hand, which creates friction and means the data can go stale. The flexible JSON data model (section 4.7) was designed to accommodate any attribute structure, so adding connectors would not require schema changes. The implementation would involve a connector layer that authenticates with external APIs (via OAuth where needed), fetches the relevant data, and writes it into the persona's JSON `data` field on a schedule or on demand. This is the highest-priority improvement discussed in section 6.2.
+
+**Limited Social Authentication Options (Architecture - Low Priority)**
+
+As established in section 1.5, this project is not an authentication system; it is a representation layer that integrates with existing identity providers. The current Cognito integration demonstrates this principle, but it only supports email/password registration through Cognito's hosted UI. It does not yet offer social login options such as "Sign in with Google" or "Sign in with Microsoft." Cognito itself supports federation with Google, Facebook, Apple, and SAML providers like Azure AD, so enabling these would primarily be a configuration change on the Cognito side, plus adding the appropriate identity provider scopes to the OIDC request. The application code would require minimal changes since the callback flow already handles any identity Cognito returns. Expanding the range of supported providers would reinforce the project's design philosophy: Plural delegates authentication to dedicated identity platforms and focuses entirely on persona management.
+
 **Limited Frontend Validation (Usability - Low Priority)**
 
 The web forms use HTML5 validation attributes (`required`, `type="email"`, `minlength`, `maxlength`) to catch common errors before submission, but more advanced checks (such as duplicate email or username detection) still rely on server-side validation and require a full page reload. Adding asynchronous validation (e.g., checking username availability as the user types) would improve the experience, but this is low priority because the REST API is the primary product and its Pydantic validation is solid.
@@ -478,7 +486,7 @@ The current system allows users to create multiple personas, each belonging to a
 
 ### 6.2 What I Would Do Next
 
-The Cognito OIDC integration, originally identified as the highest-priority improvement, has now been implemented (see section 4.5). With authentication addressed, the feature I would most want to add next is **external platform connectors**, allowing a persona to pull data from external APIs automatically. For example, a Gamer persona could sync with Steam to display current stats, or a Professional persona could pull repositories from GitHub. This would move Plural from a static data store to a live identity aggregation layer, which is closer to the original vision described in section 1.3.
+The highest-priority improvement is **external platform connectors**, as discussed in section 5.5. Currently all persona data is entered manually, which creates friction and means the data can become outdated. Adding connectors that pull data from external APIs (e.g., Steam for gaming stats, GitHub for repositories) would move Plural from a static data store to a live identity aggregation layer, which is closer to the original vision described in section 1.3.
 
 ### 6.3 Reflection
 
