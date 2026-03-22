@@ -429,13 +429,15 @@ The 76 tests are organised into the following groups, as shown in Table 4.
 
 ### 5.2.2 Results Against Success Criteria
 
-In section 5.1, I defined three concrete success criteria. Here is how the tests validate each one:
+In section 5.1, I defined four success criteria. Here is how the tests validate each one:
 
-**Security Compliance ("Private Personas must return 403 Forbidden when accessed without a token"):** Multiple tests confirm this. `test_get_private_persona_without_token_forbidden` sends a GET request to a private persona without any token header and asserts a 403 response. `test_get_private_persona_with_invalid_token` does the same with a wrong token and also gets 403.
+**Privacy Enforcement ("Private Personas must return 403 Forbidden when accessed without a token"):** Multiple tests confirm this. `test_get_private_persona_without_token_forbidden` sends a GET request to a private persona without any token header and asserts a 403 response. `test_get_private_persona_with_invalid_token` does the same with a wrong token and also gets 403.
 
-**Contextual Accuracy ("The API must return distinct attributes for the same user ID when requested with different headers"):** The `test_same_user_different_responses` test creates a user with both public and private personas, then shows that `GET /api/users/{id}` returns only the public persona, while `GET /api/personas/{id}` with the correct access token returns the private one. Same user, different views.
+**Contextual Identity ("The API must return distinct attributes for the same user ID when requested with different headers"):** The `test_same_user_different_responses` test creates a user with both public and private personas, then shows that `GET /api/users/{id}` returns only the public persona, while `GET /api/personas/{id}` with the correct access token returns the private one. Same user, different views.
 
 **Data Integrity ("Deleting a User must cascade and remove all associated Personas"):** The `test_delete_user_deletes_all_personas` test creates a user with personas, deletes the user, and verifies that both personas return 404.
+
+**Input Validation ("The API must reject malformed input with appropriate error codes"):** The User Create tests cover invalid emails, missing required fields, usernames shorter than the minimum length, and duplicate email/username conflicts. In each case the API returns `400` or `422` as expected, confirming that Pydantic validation rejects bad input before it reaches the database.
 
 ### 5.3 Web Interface Verification (Manual Walkthrough)
 
