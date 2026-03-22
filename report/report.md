@@ -22,11 +22,11 @@ Modern digital platforms are designed to capture or focus on a certain dimension
 
 However, while these dimensions are distinct in function, focus and interest they belong to a single human entity. The current digital infrastructure fails to reflect this unity. These platforms operate as isolated silos, unaware of the user's existence outside their specific boundary. This fragmentation is not just a technical inconvenience. Research shows that people naturally present different sides of themselves in different social contexts [1], and that current platforms force all these audiences into one view, a phenomenon known as "context collapse" [2].
 
-**Centralized Identity Management:** The user lacks a centralized mechanism to observe and manage these fragmented selves, Instead, they are forced to manually duplicate data and manage different profiles across different systems, leading to administrative friction and a loss of holistic control over their own scattered digital footprint.
+**Centralized Identity Management:** The user lacks a centralized mechanism to manage these fragmented selves. Instead, they must manually duplicate data across different systems, leading to administrative friction and a loss of holistic control over their digital footprint.
 
-**Public multidimensional Identity:** This presents another challenge, particularly for individuals with multifaceted talents and diverse interests. These users want to reflect a fair, multidimensional public picture of themselves; for example, they want to say: 'I am a professional software engineer, but I am also a reader interested in history and philosophy, and a gamer who loves Chess and League of Legends'; A definition that spans different dimensions.
+**Public multidimensional Identity:** This presents another challenge, particularly for individuals with diverse interests. These users want to reflect a multidimensional public picture of themselves; for example: 'I am a software engineer, but also a reader interested in philosophy and a gamer who loves Chess and League of Legends'. A definition that spans different dimensions.
 
-**Private Identity:** Equally important is the need for privacy and boundary enforcement. While users often want to show multiple sides of themselves, they also need to keep other sides strictly confidential. For instance, a user must share their legal identity for government services but may need to hide that same identity from online gaming communities for safety. Currently, users lack the granular control to ensure that sensitive private attributes (like a legal name) do not leak into inappropriate contexts.
+**Private Identity:** Equally important is the need for privacy and boundary enforcement. While users want to show multiple sides of themselves, they also need to keep other sides strictly confidential. For instance, a user must share their legal identity for government services but may need to hide it from online gaming communities for safety. Currently, users lack the granular control to ensure that sensitive private attributes do not leak into inappropriate contexts.
 
 **Conclusion:** To bridge these gaps, we need a centralized system where users can manage their identity dimensions, choosing what to share publicly and what to keep private, while integrating seamlessly with existing external platforms via a RESTful API.
 
@@ -44,7 +44,7 @@ The system responds dynamically based on the context. If a recruiter queries the
 
 It's important to define a clear scope to avoid any scope creep
 
-**What this project IS:** The application is a Representation Layer: it manages how a user wants to present themselves in different contexts. Users create multiple personas, each belonging to a context (e.g. Professional, Gaming, Legal) and carrying its own set of attributes and a public/private visibility toggle. The system exposes these personas through a REST API and a web interface, enforcing privacy boundaries so that the same user profile can return completely different data depending on who is asking and what access they have. The core contribution is contextual identity projection, not authentication or access control.
+**What this project IS:** The application is a Representation Layer: it manages how a user presents themselves in different contexts. Users create multiple personas, each belonging to a context (e.g. Professional, Gaming, Legal) with its own attributes and a public/private visibility toggle. The system exposes these personas through a REST API and a web interface, enforcing privacy boundaries so that the same profile returns different data depending on who is asking. The core contribution is contextual identity projection, not authentication or access control.
 
 **What this project is NOT:** To clarify the specific contribution of this work, it is important to distinguish it from existing terms:
 
@@ -52,7 +52,7 @@ It's important to define a clear scope to avoid any scope creep
 
 - **This is not a Single Sign-On (SSO) Solution:** The goal is not to provide a mechanism where users sign in once to access multiple platforms without sharing credentials.
 
-In practice, the system supports two authentication methods: a built-in session-based flow (email/password) and a delegated flow via AWS Cognito using OpenID Connect (OIDC). The persona management logic remains completely independent of how the user authenticated. The design philosophy is integration, not competition: the application delegates authentication to dedicated identity providers and focuses on managing and projecting the user's personas.
+In practice, the system supports two authentication methods: a built-in session-based flow (email/password) and a delegated flow via AWS Cognito using OIDC. The persona logic is completely independent of how the user authenticated. The design philosophy is integration, not competition: the application delegates authentication to dedicated identity providers and focuses on persona management.
 
 ### 1.6 Motivation
 
